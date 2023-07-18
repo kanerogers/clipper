@@ -92,7 +92,7 @@ impl Dave {
         // Velocity, baby!
         let displacement = self.velocity * PLAYER_SPEED * dt;
         self.position += displacement;
-        self.position.y = self.position.y.min(5.).max(1.);
+        self.position.y = self.position.y.clamp(1., 5.);
     }
 }
 
@@ -186,7 +186,7 @@ fn set_camera_distance(input: &Input, camera: &mut Camera, dt: f32) {
         println!("camera zoom: {}", input.camera_zoom);
         camera.start_distance = camera.distance;
         camera.desired_distance += input.camera_zoom;
-        camera.desired_distance = camera.desired_distance.max(5.).min(50.);
+        camera.desired_distance = camera.desired_distance.clamp(5., 50.);
     }
 
     let current_delta = camera.desired_distance - camera.distance;
