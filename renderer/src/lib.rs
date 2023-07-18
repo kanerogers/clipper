@@ -11,6 +11,8 @@ use winit::{event_loop::EventLoop, window::Window};
 
 pub use crate::vulkan_texture::NO_TEXTURE_ID;
 use crate::{lazy_renderer::RenderSurface, vulkan_context::VulkanContext};
+pub use glam;
+pub use winit;
 
 #[derive(Default, Debug, Clone, Copy)]
 pub struct Vertex {

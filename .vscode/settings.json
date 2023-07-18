@@ -1,0 +1,6 @@
+{
+    "rust-analyzer.cargo.extraArgs": [
+        "--target-dir",
+        "C:/windows/temp/rust-analyzer-check/clipper"
+    ]
+}

@@ -4,10 +4,6 @@
 		{
 			"type": "cargo",
 			"command": "run",
-			"args": [
-				"--example",
-				"textured_cube"
-			],
 			"problemMatcher": [
 				"$rustc"
 			],
@@ -15,7 +11,10 @@
 				"kind": "test",
 				"isDefault": true
 			},
-			"label": "rust: cargo run"
+			"label": "rust: cargo run",
+			"env": {
+				"RUST_LOG": "clipper",
+			}
 		}
 	]
 }

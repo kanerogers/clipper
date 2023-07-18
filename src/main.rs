@@ -1,16 +1,26 @@
-use lazy_vulkan::{DrawCall, LazyVulkan, Vertex, NO_TEXTURE_ID};
-use winit::{
-    event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent},
-    event_loop::ControlFlow,
-    platform::run_return::EventLoopExtRunReturn,
+use renderer::{
+    winit::{
+        self,
+        event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent},
+        event_loop::EventLoop,
+        platform::run_return::EventLoopExtRunReturn,
+    },
+    DrawCall, LazyRenderer, LazyVulkan, Vertex,
 };
+use winit::event_loop::ControlFlow;
 
-pub fn main() {
+#[hot_lib_reloader::hot_module(dylib = "game", lib_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/target/debug"))]
+mod hot_lib {
+    hot_functions_from_file!("game/src/lib.rs");
+
+    pub use game::Game;
+}
+
+pub fn init() -> (LazyVulkan, LazyRenderer, EventLoop<()>) {
     env_logger::init();
 
-    // CUUUUUUUUUUUUBE
+    // it's a plane
     let vertices = [
-        // front face
         Vertex::new([1.0, 1.0, 0.0, 1.0], [1.0, 0.0, 0.0, 0.0], [0.0, 0.0]),
         Vertex::new([-1.0, 1.0, 0.0, 1.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0]),
         Vertex::new([-1.0, -1.0, 0.0, 1.0], [0.0, 0.0, 1.0, 0.0], [0.0, 0.0]),
@@ -20,7 +30,7 @@ pub fn main() {
     let indices = [0, 1, 2, 2, 3, 0];
 
     // Alright, let's build some stuff
-    let (mut lazy_vulkan, mut lazy_renderer, mut event_loop) = LazyVulkan::builder()
+    let (lazy_vulkan, mut lazy_renderer, event_loop) = LazyVulkan::builder()
         .initial_vertices(&vertices)
         .initial_indices(&indices)
         .with_present(true)
@@ -30,10 +40,14 @@ pub fn main() {
     lazy_renderer.camera.position.z = 10.;
     lazy_renderer.camera.pitch = -15_f32.to_radians();
 
-    let draw_calls = [DrawCall::new(0, 6, NO_TEXTURE_ID, Default::default())];
+    (lazy_vulkan, lazy_renderer, event_loop)
+}
+
+fn main() {
+    let (mut lazy_vulkan, mut renderer, mut event_loop) = init();
+    let mut game = hot_lib::Game::default();
 
     // Off we go!
-    // TODO: How do we share this between examples?
     let mut winit_initializing = true;
     event_loop.run_return(|event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
@@ -63,7 +77,18 @@ pub fn main() {
 
             Event::MainEventsCleared => {
                 let framebuffer_index = lazy_vulkan.render_begin();
-                lazy_renderer.render(&lazy_vulkan.context(), framebuffer_index, &draw_calls);
+
+                hot_lib::tick(&mut game);
+
+                let draw_calls = game
+                    .meshes
+                    .iter()
+                    .map(|m| {
+                        DrawCall::new(m.index_offset, m.index_count, m.texture_id, m.transform)
+                    })
+                    .collect::<Vec<_>>();
+
+                renderer.render(&lazy_vulkan.context(), framebuffer_index, &draw_calls);
                 lazy_vulkan
                     .render_end(framebuffer_index, &[lazy_vulkan.present_complete_semaphore]);
             }
@@ -75,7 +100,7 @@ pub fn main() {
                     return;
                 } else {
                     let new_render_surface = lazy_vulkan.resized(size.width, size.height);
-                    lazy_renderer.update_surface(new_render_surface, &lazy_vulkan.context().device);
+                    renderer.update_surface(new_render_surface, &lazy_vulkan.context().device);
                 }
             }
 
@@ -85,6 +110,6 @@ pub fn main() {
 
     // I guess we better do this or else the Dreaded Validation Layers will complain
     unsafe {
-        lazy_renderer.cleanup(&lazy_vulkan.context().device);
+        renderer.cleanup(&lazy_vulkan.context().device);
     }
 }
