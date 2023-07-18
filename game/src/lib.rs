@@ -89,7 +89,7 @@ impl Dave {
         movement.y = input_movement.y;
         movement = movement.normalize_or_zero();
 
-        self.velocity = movement;
+        self.velocity = self.velocity.lerp(movement, 0.1);
 
         // Velocity, baby!
         let displacement = self.velocity * PLAYER_SPEED * dt;
