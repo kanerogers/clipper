@@ -3,9 +3,8 @@
 #define WORKFLOW_MAIN 0
 #define WORKFLOW_TEXT 1
 
-layout (location = 0) in vec4 in_color;
-layout (location = 1) in vec2 in_uv;
-layout (location = 0) out vec4 out_color;
+layout (location = 0) in vec2 in_uv;
+layout (location = 0) out vec4 out_colour;
 
 layout(set = 0, binding = 0) uniform sampler2D textures[16];
 
@@ -13,10 +12,9 @@ layout(set = 0, binding = 0) uniform sampler2D textures[16];
 
 void main() {
     if (texture_id == NO_TEXTURE) {
-        out_color = in_color;
+        out_colour = vec4(colour_factor, 1.0);
         return;
     } 
     
-    vec4 user_texture = texture(textures[texture_id], in_uv);
-    out_color = in_color * user_texture;
+    out_colour = vec4(colour_factor, 1.0) * texture(textures[texture_id], in_uv);
 }

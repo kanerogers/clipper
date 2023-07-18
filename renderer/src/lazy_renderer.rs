@@ -5,7 +5,7 @@ use crate::{
     vulkan_texture::{VulkanTexture, VulkanTextureCreateInfo},
     LazyVulkanBuilder, Vertex,
 };
-use common::glam;
+use common::{glam, Mesh};
 use std::ffi::CStr;
 
 use ash::vk;
@@ -112,36 +112,12 @@ impl DepthBuffer {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
-/// A single draw call to render a mesh
-pub struct DrawCall {
-    index_offset: u32,
-    index_count: u32,
-    texture_id: u32,
-    transform: glam::Affine3A,
-}
-
-impl DrawCall {
-    pub fn new(
-        index_offset: u32,
-        index_count: u32,
-        texture_id: u32,
-        transform: glam::Affine3A,
-    ) -> Self {
-        Self {
-            index_offset,
-            index_count,
-            texture_id,
-            transform,
-        }
-    }
-}
-
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
-/// Push constant used to determine texture and workflow
+/// Push constants!
 struct PushConstant {
     mvp: glam::Mat4,
+    colour_factor: glam::Vec3,
     texture_id: u32,
 }
 
@@ -149,8 +125,12 @@ unsafe impl Zeroable for PushConstant {}
 unsafe impl Pod for PushConstant {}
 
 impl PushConstant {
-    pub fn new(texture_id: u32, mvp: glam::Mat4) -> Self {
-        Self { texture_id, mvp }
+    pub fn new(texture_id: u32, mvp: glam::Mat4, colour_factor: Option<glam::Vec3>) -> Self {
+        Self {
+            texture_id,
+            colour_factor: colour_factor.unwrap_or(glam::Vec3::ONE),
+            mvp,
+        }
     }
 }
 
@@ -311,16 +291,9 @@ impl LazyRenderer {
                 format: vk::Format::R32G32B32A32_SFLOAT,
                 offset: bytemuck::offset_of!(Vertex, position) as _,
             },
-            // color
-            vk::VertexInputAttributeDescription {
-                location: 1,
-                binding: 0,
-                format: vk::Format::R32G32B32A32_SFLOAT,
-                offset: bytemuck::offset_of!(Vertex, colour) as _,
-            },
             // UV / texcoords
             vk::VertexInputAttributeDescription {
-                location: 2,
+                location: 1,
                 binding: 0,
                 format: vk::Format::R32G32_SFLOAT,
                 offset: bytemuck::offset_of!(Vertex, uv) as _,
@@ -435,13 +408,8 @@ impl LazyRenderer {
         }
     }
 
-    /// Render the draw calls we've built up
-    pub fn render(
-        &self,
-        vulkan_context: &VulkanContext,
-        framebuffer_index: u32,
-        draw_calls: &[DrawCall],
-    ) {
+    /// Render the meshes we've been given
+    pub fn render(&self, vulkan_context: &VulkanContext, framebuffer_index: u32, meshes: &[Mesh]) {
         let device = &vulkan_context.device;
         let command_buffer = vulkan_context.draw_command_buffer;
 
@@ -514,14 +482,18 @@ impl LazyRenderer {
                 glam::Mat4::perspective_rh(60_f32.to_radians(), aspect_ratio, 0.01, 1000.);
             perspective.y_axis[1] *= -1.;
 
-            for draw_call in draw_calls {
+            for draw_call in meshes {
                 let mvp: glam::Mat4 = perspective * self.camera.matrix() * draw_call.transform;
                 device.cmd_push_constants(
                     command_buffer,
                     self.pipeline_layout,
                     vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
                     0,
-                    bytemuck::bytes_of(&PushConstant::new(draw_call.texture_id, mvp.into())),
+                    bytemuck::bytes_of(&PushConstant::new(
+                        draw_call.texture_id,
+                        mvp.into(),
+                        draw_call.colour,
+                    )),
                 );
 
                 // Draw the mesh with the indexes we were provided

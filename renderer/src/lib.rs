@@ -8,7 +8,7 @@ use common::glam;
 
 use ash::vk;
 use glam::{Vec2, Vec4};
-pub use lazy_renderer::{DrawCall, LazyRenderer};
+pub use lazy_renderer::LazyRenderer;
 use winit::{event_loop::EventLoop, window::Window};
 
 pub use crate::vulkan_texture::NO_TEXTURE_ID;
@@ -18,7 +18,6 @@ pub use winit;
 #[derive(Default, Debug, Clone, Copy)]
 pub struct Vertex {
     pub position: Vec4,
-    pub colour: Vec4,
     pub uv: Vec2,
 }
 
@@ -31,10 +30,9 @@ pub struct SwapchainInfo {
 }
 
 impl Vertex {
-    pub fn new<T: Into<Vec4>, U: Into<Vec2>>(position: T, colour: T, uv: U) -> Self {
+    pub fn new<T: Into<Vec4>, U: Into<Vec2>>(position: T, uv: U) -> Self {
         Self {
             position: position.into(),
-            colour: colour.into(),
             uv: uv.into(),
         }
     }

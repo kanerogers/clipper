@@ -5,11 +5,11 @@ use renderer::{
         event_loop::EventLoop,
         platform::run_return::EventLoopExtRunReturn,
     },
-    DrawCall, LazyRenderer, LazyVulkan, Vertex,
+    LazyRenderer, LazyVulkan, Vertex,
 };
 use winit::event_loop::ControlFlow;
 
-#[hot_lib_reloader::hot_module(dylib = "game")]
+#[hot_lib_reloader::hot_module(dylib = "game", file_watch_debounce = 100)]
 mod hot_lib {
     hot_functions_from_file!("game/src/lib.rs");
 
@@ -21,10 +21,10 @@ pub fn init() -> (LazyVulkan, LazyRenderer, EventLoop<()>) {
 
     // it's a plane
     let vertices = [
-        Vertex::new([1.0, 1.0, 0.0, 1.0], [1.0, 0.0, 0.0, 0.0], [0.0, 0.0]),
-        Vertex::new([-1.0, 1.0, 0.0, 1.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0]),
-        Vertex::new([-1.0, -1.0, 0.0, 1.0], [0.0, 0.0, 1.0, 0.0], [0.0, 0.0]),
-        Vertex::new([1.0, -1.0, 0.0, 1.0], [0.0, 0.0, 1.0, 0.0], [0.0, 0.0]),
+        Vertex::new([1.0, 1.0, 0.0, 1.0], [0.0, 0.0]),
+        Vertex::new([-1.0, 1.0, 0.0, 1.0], [0.0, 0.0]),
+        Vertex::new([-1.0, -1.0, 0.0, 1.0], [0.0, 0.0]),
+        Vertex::new([1.0, -1.0, 0.0, 1.0], [0.0, 0.0]),
     ];
 
     let indices = [0, 1, 2, 2, 3, 0];
@@ -80,15 +80,7 @@ fn main() {
 
                 hot_lib::tick(&mut game);
 
-                let draw_calls = game
-                    .meshes
-                    .iter()
-                    .map(|m| {
-                        DrawCall::new(m.index_offset, m.index_count, m.texture_id, m.transform)
-                    })
-                    .collect::<Vec<_>>();
-
-                renderer.render(&lazy_vulkan.context(), framebuffer_index, &draw_calls);
+                renderer.render(&lazy_vulkan.context(), framebuffer_index, &game.meshes);
                 lazy_vulkan
                     .render_end(framebuffer_index, &[lazy_vulkan.present_complete_semaphore]);
             }
