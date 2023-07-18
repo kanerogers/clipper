@@ -5,11 +5,11 @@ use renderer::{
         event_loop::EventLoop,
         platform::run_return::EventLoopExtRunReturn,
     },
-    LazyRenderer, LazyVulkan, Vertex,
+    LazyRenderer, LazyVulkan,
 };
 use winit::event_loop::ControlFlow;
 
-#[hot_lib_reloader::hot_module(dylib = "game", file_watch_debounce = 100)]
+#[hot_lib_reloader::hot_module(dylib = "game", file_watch_debounce = 20)]
 mod hot_lib {
     hot_functions_from_file!("game/src/lib.rs");
 
@@ -19,20 +19,8 @@ mod hot_lib {
 pub fn init() -> (LazyVulkan, LazyRenderer, EventLoop<()>) {
     env_logger::init();
 
-    // it's a plane
-    let vertices = [
-        Vertex::new([1.0, 1.0, 0.0, 1.0], [0.0, 0.0]),
-        Vertex::new([-1.0, 1.0, 0.0, 1.0], [0.0, 0.0]),
-        Vertex::new([-1.0, -1.0, 0.0, 1.0], [0.0, 0.0]),
-        Vertex::new([1.0, -1.0, 0.0, 1.0], [0.0, 0.0]),
-    ];
-
-    let indices = [0, 1, 2, 2, 3, 0];
-
     // Alright, let's build some stuff
     let (lazy_vulkan, mut lazy_renderer, event_loop) = LazyVulkan::builder()
-        .initial_vertices(&vertices)
-        .initial_indices(&indices)
         .with_present(true)
         .window_size([1000, 1000])
         .build();
@@ -46,7 +34,7 @@ pub fn init() -> (LazyVulkan, LazyRenderer, EventLoop<()>) {
 
 fn main() {
     let (mut lazy_vulkan, mut renderer, mut event_loop) = init();
-    let mut game = hot_lib::Game::default();
+    let mut game = hot_lib::Game::new();
 
     // Off we go!
     let mut winit_initializing = true;
@@ -54,20 +42,17 @@ fn main() {
         *control_flow = ControlFlow::Poll;
         match event {
             Event::WindowEvent {
-                event:
-                    WindowEvent::CloseRequested
-                    | WindowEvent::KeyboardInput {
-                        input:
-                            KeyboardInput {
-                                state: ElementState::Pressed,
-                                virtual_keycode: Some(VirtualKeyCode::Escape),
-                                ..
-                            },
-                        ..
-                    },
+                event: WindowEvent::CloseRequested,
                 ..
-            } => *control_flow = ControlFlow::Exit,
-
+            } => {
+                *control_flow = ControlFlow::Exit;
+            }
+            Event::WindowEvent {
+                event: WindowEvent::KeyboardInput { input, .. },
+                ..
+            } => {
+                handle_keypress(&mut game, input);
+            }
             Event::NewEvents(cause) => {
                 if cause == winit::event::StartCause::Init {
                     winit_initializing = true;
@@ -79,7 +64,10 @@ fn main() {
             Event::MainEventsCleared => {
                 let framebuffer_index = lazy_vulkan.render_begin();
 
-                hot_lib::tick(&mut game);
+                {
+                    game.time.start_frame();
+                    hot_lib::tick(&mut game);
+                }
 
                 renderer.render(&lazy_vulkan.context(), framebuffer_index, &game.meshes);
                 lazy_vulkan
@@ -104,5 +92,30 @@ fn main() {
     // I guess we better do this or else the Dreaded Validation Layers will complain
     unsafe {
         renderer.cleanup(&lazy_vulkan.context().device);
+    }
+}
+
+fn handle_keypress(game: &mut game::Game, keyboard_input: winit::event::KeyboardInput) -> () {
+    let game_input = &mut game.input;
+    let KeyboardInput {
+        virtual_keycode,
+        state,
+        ..
+    } = keyboard_input;
+    match (state, virtual_keycode) {
+        (ElementState::Pressed, Some(VirtualKeyCode::A)) => game_input.movement.x = -1.,
+        (ElementState::Released, Some(VirtualKeyCode::A)) => game_input.movement.x = 0.,
+        (ElementState::Pressed, Some(VirtualKeyCode::D)) => game_input.movement.x = 1.,
+        (ElementState::Released, Some(VirtualKeyCode::D)) => game_input.movement.x = 0.,
+        (ElementState::Pressed, Some(VirtualKeyCode::W)) => game_input.movement.z = -1.,
+        (ElementState::Released, Some(VirtualKeyCode::W)) => game_input.movement.z = 0.,
+        (ElementState::Pressed, Some(VirtualKeyCode::S)) => game_input.movement.z = 1.,
+        (ElementState::Released, Some(VirtualKeyCode::S)) => game_input.movement.z = 0.,
+        (ElementState::Pressed, Some(VirtualKeyCode::Space)) => game_input.movement.y = 1.,
+        (ElementState::Released, Some(VirtualKeyCode::Space)) => game_input.movement.y = 0.,
+        (ElementState::Pressed, Some(VirtualKeyCode::C)) => game_input.movement.y = -1.,
+        (ElementState::Released, Some(VirtualKeyCode::C)) => game_input.movement.y = 0.,
+        (ElementState::Pressed, Some(VirtualKeyCode::Escape)) => *game = Default::default(),
+        _ => {}
     }
 }

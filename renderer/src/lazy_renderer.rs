@@ -5,7 +5,8 @@ use crate::{
     vulkan_texture::{VulkanTexture, VulkanTextureCreateInfo},
     LazyVulkanBuilder, Vertex,
 };
-use common::{glam, Mesh};
+use common::{glam, Geometry, Mesh};
+use glam::{Vec2, Vec4};
 use std::ffi::CStr;
 
 use ash::vk;
@@ -40,6 +41,8 @@ pub struct LazyRenderer {
     pub descriptors: Descriptors,
     /// You know. A camera.
     pub camera: Camera,
+    /// Some trivial geometry
+    pub geometry_offsets: GeometryOffsets,
 }
 
 #[derive(Clone)]
@@ -219,15 +222,18 @@ impl LazyRenderer {
 
         let framebuffers = create_framebuffers(&render_surface, render_pass, device);
 
+        // Populate geometry buffers
+        let (initial_indices, initial_vertices, geometry_offsets) = create_initial_geometry();
+
         let index_buffer = Buffer::new(
             vulkan_context,
             vk::BufferUsageFlags::INDEX_BUFFER,
-            &builder.initial_indices,
+            &initial_indices,
         );
         let vertex_buffer = Buffer::new(
             vulkan_context,
             vk::BufferUsageFlags::VERTEX_BUFFER,
-            &builder.initial_vertices,
+            &initial_vertices,
         );
 
         let vertex_shader_info = vk::ShaderModuleCreateInfo::builder().code(VERTEX_SHADER);
@@ -405,6 +411,7 @@ impl LazyRenderer {
             vertex_buffer,
             user_textures: Default::default(),
             camera: Default::default(),
+            geometry_offsets,
         }
     }
 
@@ -496,13 +503,19 @@ impl LazyRenderer {
                     )),
                 );
 
+                let IndexBufferEntry {
+                    index_count,
+                    index_offset,
+                    vertex_offset,
+                } = self.geometry_offsets.get(draw_call.geometry);
+
                 // Draw the mesh with the indexes we were provided
                 device.cmd_draw_indexed(
                     command_buffer,
-                    draw_call.index_count,
+                    index_count,
                     1,
-                    draw_call.index_offset,
-                    0,
+                    index_offset,
+                    vertex_offset as _,
                     1,
                 );
             }
@@ -568,6 +581,36 @@ impl LazyRenderer {
     }
 }
 
+fn create_initial_geometry() -> (Vec<u32>, Vec<Vertex>, GeometryOffsets) {
+    let mut vertices = vec![];
+    let mut indices = vec![];
+
+    let (plane_vertices, plane_indices) = generate_mesh(Geometry::Plane);
+    let plane = IndexBufferEntry::new(plane_indices.len(), indices.len(), vertices.len());
+    vertices.extend(plane_vertices);
+    indices.extend(plane_indices);
+
+    let (cube_vertices, cube_indices) = generate_mesh(Geometry::Cube);
+    let cube = IndexBufferEntry::new(cube_indices.len(), indices.len(), vertices.len());
+    vertices.extend(cube_vertices);
+    indices.extend(cube_indices);
+
+    let (sphere_vertices, sphere_indices) = generate_mesh(Geometry::Sphere);
+    let sphere = IndexBufferEntry::new(sphere_indices.len(), indices.len(), vertices.len());
+    vertices.extend(sphere_vertices);
+    indices.extend(sphere_indices);
+
+    let offsets = GeometryOffsets {
+        plane,
+        cube,
+        sphere,
+    };
+
+    log::debug!("Created geometry offsets: {:?}", offsets);
+
+    (indices, vertices, offsets)
+}
+
 fn create_framebuffers(
     render_surface: &RenderSurface,
     render_pass: vk::RenderPass,
@@ -614,4 +657,256 @@ fn create_depth_buffers(
             }
         })
         .collect::<Vec<_>>()
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct IndexBufferEntry {
+    pub index_count: u32,
+    pub index_offset: u32,
+    pub vertex_offset: u32,
+}
+
+impl IndexBufferEntry {
+    pub fn new(index_count: usize, index_offset: usize, vertex_offset: usize) -> Self {
+        Self {
+            index_count: index_count as _,
+            index_offset: index_offset as _,
+            vertex_offset: vertex_offset as _,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct GeometryOffsets {
+    plane: IndexBufferEntry,
+    cube: IndexBufferEntry,
+    sphere: IndexBufferEntry,
+}
+impl GeometryOffsets {
+    fn get(&self, geometry: Geometry) -> IndexBufferEntry {
+        match geometry {
+            Geometry::Plane => self.plane,
+            Geometry::Sphere => self.sphere,
+            Geometry::Cube => self.cube,
+        }
+    }
+}
+
+pub fn generate_mesh(geometry: Geometry) -> (Vec<Vertex>, Vec<u32>) {
+    match geometry {
+        Geometry::Plane => {
+            let vertices = vec![
+                Vertex {
+                    position: Vec4::new(-1.0, -1.0, 0.0, 1.0),
+                    normal: Vec4::new(0.0, 0.0, 1.0, 0.0),
+                    uv: Vec2::new(0.0, 0.0),
+                },
+                Vertex {
+                    position: Vec4::new(1.0, -1.0, 0.0, 1.0),
+                    normal: Vec4::new(0.0, 0.0, 1.0, 0.0),
+                    uv: Vec2::new(1.0, 0.0),
+                },
+                Vertex {
+                    position: Vec4::new(1.0, 1.0, 0.0, 1.0),
+                    normal: Vec4::new(0.0, 0.0, 1.0, 0.0),
+                    uv: Vec2::new(1.0, 1.0),
+                },
+                Vertex {
+                    position: Vec4::new(-1.0, 1.0, 0.0, 1.0),
+                    normal: Vec4::new(0.0, 0.0, 1.0, 0.0),
+                    uv: Vec2::new(0.0, 1.0),
+                },
+            ];
+
+            let indices = vec![0, 1, 2, 2, 3, 0];
+
+            (vertices, indices)
+        }
+
+        Geometry::Sphere => {
+            // Simplified UV Sphere
+            let mut vertices = vec![];
+            let mut indices = vec![];
+            let sectors = 10;
+            let stacks = 10;
+            let radius = 1.0;
+            let pi = std::f32::consts::PI;
+
+            for i in 0..=stacks {
+                let stack_angle = pi / 2.0 - i as f32 / stacks as f32 * pi; // starting from pi/2 to -pi/2
+                let xy = radius * stack_angle.cos(); // r * cos(u)
+                let z = radius * stack_angle.sin(); // r * sin(u)
+
+                for j in 0..=sectors {
+                    let sector_angle = j as f32 / sectors as f32 * pi * 2.0; // starting from 0 to 2pi
+
+                    // vertex position (x, y, z)
+                    let x = xy * sector_angle.cos(); // r * cos(u) * cos(v)
+                    let y = xy * sector_angle.sin(); // r * cos(u) * sin(v)
+                    vertices.push(Vertex {
+                        position: Vec4::new(x, y, z, 1.0),
+                        normal: Vec4::new(x, y, z, 0.0).normalize(), // normalized
+                        uv: Vec2::new(j as f32 / sectors as f32, i as f32 / stacks as f32), // normalized
+                    });
+
+                    // indices
+                    if i != 0 && j != 0 {
+                        let a = (sectors + 1) * i + j; // current top right
+                        let b = a - 1; // current top left
+                        let c = a - (sectors + 1); // previous top right
+                        let d = a - (sectors + 1) - 1; // previous top left
+                        indices.push(a as u32);
+                        indices.push(b as u32);
+                        indices.push(c as u32);
+                        indices.push(b as u32);
+                        indices.push(d as u32);
+                        indices.push(c as u32);
+                    }
+                }
+            }
+
+            (vertices, indices)
+        }
+        Geometry::Cube => {
+            let vertices = vec![
+                // Front face
+                Vertex {
+                    position: Vec4::new(-1.0, -1.0, 1.0, 1.0),
+                    normal: Vec4::new(0.0, 0.0, 1.0, 0.0),
+                    uv: Vec2::new(0.0, 0.0),
+                },
+                Vertex {
+                    position: Vec4::new(1.0, -1.0, 1.0, 1.0),
+                    normal: Vec4::new(0.0, 0.0, 1.0, 0.0),
+                    uv: Vec2::new(1.0, 0.0),
+                },
+                Vertex {
+                    position: Vec4::new(1.0, 1.0, 1.0, 1.0),
+                    normal: Vec4::new(0.0, 0.0, 1.0, 0.0),
+                    uv: Vec2::new(1.0, 1.0),
+                },
+                Vertex {
+                    position: Vec4::new(-1.0, 1.0, 1.0, 1.0),
+                    normal: Vec4::new(0.0, 0.0, 1.0, 0.0),
+                    uv: Vec2::new(0.0, 1.0),
+                },
+                // Right face
+                Vertex {
+                    position: Vec4::new(1.0, -1.0, 1.0, 1.0),
+                    normal: Vec4::new(1.0, 0.0, 0.0, 0.0),
+                    uv: Vec2::new(0.0, 0.0),
+                },
+                Vertex {
+                    position: Vec4::new(1.0, -1.0, -1.0, 1.0),
+                    normal: Vec4::new(1.0, 0.0, 0.0, 0.0),
+                    uv: Vec2::new(1.0, 0.0),
+                },
+                Vertex {
+                    position: Vec4::new(1.0, 1.0, -1.0, 1.0),
+                    normal: Vec4::new(1.0, 0.0, 0.0, 0.0),
+                    uv: Vec2::new(1.0, 1.0),
+                },
+                Vertex {
+                    position: Vec4::new(1.0, 1.0, 1.0, 1.0),
+                    normal: Vec4::new(1.0, 0.0, 0.0, 0.0),
+                    uv: Vec2::new(0.0, 1.0),
+                },
+                // Back face
+                Vertex {
+                    position: Vec4::new(1.0, -1.0, -1.0, 1.0),
+                    normal: Vec4::new(0.0, 0.0, -1.0, 0.0),
+                    uv: Vec2::new(0.0, 0.0),
+                },
+                Vertex {
+                    position: Vec4::new(-1.0, -1.0, -1.0, 1.0),
+                    normal: Vec4::new(0.0, 0.0, -1.0, 0.0),
+                    uv: Vec2::new(1.0, 0.0),
+                },
+                Vertex {
+                    position: Vec4::new(-1.0, 1.0, -1.0, 1.0),
+                    normal: Vec4::new(0.0, 0.0, -1.0, 0.0),
+                    uv: Vec2::new(1.0, 1.0),
+                },
+                Vertex {
+                    position: Vec4::new(1.0, 1.0, -1.0, 1.0),
+                    normal: Vec4::new(0.0, 0.0, -1.0, 0.0),
+                    uv: Vec2::new(0.0, 1.0),
+                },
+                // Left face
+                Vertex {
+                    position: Vec4::new(-1.0, -1.0, -1.0, 1.0),
+                    normal: Vec4::new(-1.0, 0.0, 0.0, 0.0),
+                    uv: Vec2::new(0.0, 0.0),
+                },
+                Vertex {
+                    position: Vec4::new(-1.0, -1.0, 1.0, 1.0),
+                    normal: Vec4::new(-1.0, 0.0, 0.0, 0.0),
+                    uv: Vec2::new(1.0, 0.0),
+                },
+                Vertex {
+                    position: Vec4::new(-1.0, 1.0, 1.0, 1.0),
+                    normal: Vec4::new(-1.0, 0.0, 0.0, 0.0),
+                    uv: Vec2::new(1.0, 1.0),
+                },
+                Vertex {
+                    position: Vec4::new(-1.0, 1.0, -1.0, 1.0),
+                    normal: Vec4::new(-1.0, 0.0, 0.0, 0.0),
+                    uv: Vec2::new(0.0, 1.0),
+                },
+                // Top face
+                Vertex {
+                    position: Vec4::new(-1.0, 1.0, 1.0, 1.0),
+                    normal: Vec4::new(0.0, 1.0, 0.0, 0.0),
+                    uv: Vec2::new(0.0, 0.0),
+                },
+                Vertex {
+                    position: Vec4::new(1.0, 1.0, 1.0, 1.0),
+                    normal: Vec4::new(0.0, 1.0, 0.0, 0.0),
+                    uv: Vec2::new(1.0, 0.0),
+                },
+                Vertex {
+                    position: Vec4::new(1.0, 1.0, -1.0, 1.0),
+                    normal: Vec4::new(0.0, 1.0, 0.0, 0.0),
+                    uv: Vec2::new(1.0, 1.0),
+                },
+                Vertex {
+                    position: Vec4::new(-1.0, 1.0, -1.0, 1.0),
+                    normal: Vec4::new(0.0, 1.0, 0.0, 0.0),
+                    uv: Vec2::new(0.0, 1.0),
+                },
+                // Bottom face
+                Vertex {
+                    position: Vec4::new(-1.0, -1.0, -1.0, 1.0),
+                    normal: Vec4::new(0.0, -1.0, 0.0, 0.0),
+                    uv: Vec2::new(0.0, 0.0),
+                },
+                Vertex {
+                    position: Vec4::new(1.0, -1.0, -1.0, 1.0),
+                    normal: Vec4::new(0.0, -1.0, 0.0, 0.0),
+                    uv: Vec2::new(1.0, 0.0),
+                },
+                Vertex {
+                    position: Vec4::new(1.0, -1.0, 1.0, 1.0),
+                    normal: Vec4::new(0.0, -1.0, 0.0, 0.0),
+                    uv: Vec2::new(1.0, 1.0),
+                },
+                Vertex {
+                    position: Vec4::new(-1.0, -1.0, 1.0, 1.0),
+                    normal: Vec4::new(0.0, -1.0, 0.0, 0.0),
+                    uv: Vec2::new(0.0, 1.0),
+                },
+            ];
+
+            let indices = vec![
+                0, 1, 2, 2, 3, 0, // front
+                4, 5, 6, 6, 7, 4, // right
+                8, 9, 10, 10, 11, 8, // back
+                12, 13, 14, 14, 15, 12, // left
+                16, 17, 18, 18, 19, 16, // top
+                20, 21, 22, 22, 23, 20, // bottom
+            ];
+
+            (vertices, indices)
+        }
+    }
 }

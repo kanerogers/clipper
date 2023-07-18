@@ -4,9 +4,8 @@ pub mod lazy_renderer;
 pub mod vulkan_context;
 pub mod vulkan_texture;
 
-use common::glam;
-
 use ash::vk;
+use common::glam;
 use glam::{Vec2, Vec4};
 pub use lazy_renderer::LazyRenderer;
 use winit::{event_loop::EventLoop, window::Window};
@@ -18,7 +17,18 @@ pub use winit;
 #[derive(Default, Debug, Clone, Copy)]
 pub struct Vertex {
     pub position: Vec4,
+    pub normal: Vec4,
     pub uv: Vec2,
+}
+
+impl Vertex {
+    pub fn new<T: Into<Vec4>, U: Into<Vec2>>(position: T, normal: T, uv: U) -> Self {
+        Self {
+            position: position.into(),
+            normal: normal.into(),
+            uv: uv.into(),
+        }
+    }
 }
 
 #[repr(C)]
@@ -27,15 +37,6 @@ pub struct SwapchainInfo {
     pub image_count: u32,
     pub resolution: vk::Extent2D,
     pub format: vk::Format,
-}
-
-impl Vertex {
-    pub fn new<T: Into<Vec4>, U: Into<Vec2>>(position: T, uv: U) -> Self {
-        Self {
-            position: position.into(),
-            uv: uv.into(),
-        }
-    }
 }
 
 pub fn find_memorytype_index(
@@ -55,30 +56,21 @@ pub fn find_memorytype_index(
 
 #[derive(Default, Debug, Clone)]
 pub struct LazyVulkanBuilder {
-    pub initial_indices: Vec<u32>,
-    pub initial_vertices: Vec<Vertex>,
     pub with_present: bool,
     pub window_size: Option<vk::Extent2D>,
 }
 
 impl LazyVulkanBuilder {
-    pub fn initial_vertices(mut self, vertices: &[Vertex]) -> Self {
-        self.initial_vertices = vertices.to_vec();
-        self
-    }
-
-    pub fn initial_indices(mut self, indices: &[u32]) -> Self {
-        self.initial_indices = indices.to_vec();
-        self
-    }
-
     pub fn with_present(mut self, present: bool) -> Self {
         self.with_present = present;
         self
     }
 
     pub fn window_size(mut self, extent: [u32; 2]) -> Self {
-        self.window_size = Some(vk::Extent2D { width: extent[0], height: extent[1]});
+        self.window_size = Some(vk::Extent2D {
+            width: extent[0],
+            height: extent[1],
+        });
         self
     }
 
