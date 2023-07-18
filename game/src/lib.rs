@@ -1,7 +1,7 @@
 pub mod time;
 
 use common::{
-    glam::{Affine3A, Quat, Vec3},
+    glam::{vec3, Affine3A, Quat, Vec3},
     Camera, Geometry, Mesh,
 };
 use std::f32::consts::TAU;
@@ -23,16 +23,14 @@ pub struct Game {
 // objectively terrible input handling
 #[derive(Clone, Debug)]
 pub struct Input {
-    pub movement: Vec3,
-    pub camera_rotate: f32,
+    pub keyboard_state: u8,
     pub camera_zoom: f32,
 }
 
 impl Default for Input {
     fn default() -> Self {
         Self {
-            movement: Vec3::ZERO,
-            camera_rotate: 0.,
+            keyboard_state: 0,
             camera_zoom: 0.,
         }
     }
@@ -71,6 +69,12 @@ pub struct Dave {
 
 impl Dave {
     pub fn update(&mut self, dt: f32, input: &Input, camera_transform: &Affine3A) {
+        let input_movement = vec3(
+            ((input.keyboard_state >> 1) & 1) as f32 - ((input.keyboard_state >> 0) & 1) as f32,
+            ((input.keyboard_state >> 4) & 1) as f32 - ((input.keyboard_state >> 5) & 1) as f32,
+            ((input.keyboard_state >> 3) & 1) as f32 - ((input.keyboard_state >> 2) & 1) as f32,
+        )
+        .normalize();
         // Camera relative controls
         let mut forward = camera_transform.transform_vector3(Vec3::Z);
         forward.y = 0.;
@@ -80,14 +84,11 @@ impl Dave {
         right.y = 0.;
         right = right.normalize();
 
-        let mut movement = forward * input.movement.z + right * input.movement.x;
-        movement.y = input.movement.y;
-        movement = movement.normalize();
-        self.velocity = if !movement.is_nan() {
-            movement
-        } else {
-            Vec3::ZERO
-        };
+        let mut movement = forward * input_movement.z + right * input_movement.x;
+        movement.y = input_movement.y;
+        movement = movement.normalize_or_zero();
+
+        self.velocity = movement;
 
         // Velocity, baby!
         let displacement = self.velocity * PLAYER_SPEED * dt;
@@ -169,7 +170,9 @@ pub fn update_camera(game: &mut Game) {
     }
     camera.focus_point = camera.target.lerp(camera.focus_point, t);
 
-    camera.yaw += input.camera_rotate * CAMERA_ROTATE_SPEED * dt;
+    let camera_rotate =
+        ((input.keyboard_state >> 6) & 1) as f32 - ((input.keyboard_state >> 7) & 1) as f32;
+    camera.yaw += camera_rotate * CAMERA_ROTATE_SPEED * dt;
 
     set_camera_distance(input, camera, dt);
 
