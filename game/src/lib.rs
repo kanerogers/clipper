@@ -85,6 +85,7 @@ impl Dave {
         right = right.normalize();
 
         let mut movement = forward * input_movement.z + right * input_movement.x;
+        movement = movement.normalize_or_zero();
         movement.y = input_movement.y;
         movement = movement.normalize_or_zero();
 
