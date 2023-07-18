@@ -5,6 +5,7 @@ use crate::{
     vulkan_texture::{VulkanTexture, VulkanTextureCreateInfo},
     LazyVulkanBuilder, Vertex,
 };
+use common::glam;
 use std::ffi::CStr;
 
 use ash::vk;

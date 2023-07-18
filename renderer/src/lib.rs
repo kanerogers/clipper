@@ -4,6 +4,8 @@ pub mod lazy_renderer;
 pub mod vulkan_context;
 pub mod vulkan_texture;
 
+use common::glam;
+
 use ash::vk;
 use glam::{Vec2, Vec4};
 pub use lazy_renderer::{DrawCall, LazyRenderer};
@@ -11,7 +13,6 @@ use winit::{event_loop::EventLoop, window::Window};
 
 pub use crate::vulkan_texture::NO_TEXTURE_ID;
 use crate::{lazy_renderer::RenderSurface, vulkan_context::VulkanContext};
-pub use glam;
 pub use winit;
 
 #[derive(Default, Debug, Clone, Copy)]

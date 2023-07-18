@@ -10,15 +10,12 @@ version = "0.1.0"
 ash = {features = ["linked"], version = "0.37.2"}
 ash-window = "0.12.0"
 bytemuck = "1.13.0"
-glam = "0.22.0"
+common = {path = "../common"}
 log = "0.4.17"
 raw-window-handle = "0.5.0"
 thunderdome = "0.6.0"
 vk-shader-macros = "0.2.8"
 winit = "0.28.1"
-
-[lib]
-crate-type = ["dylib"]
 
 [dev-dependencies]
 env_logger = "0.10.0"

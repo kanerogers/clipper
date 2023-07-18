@@ -6,12 +6,12 @@ version = "0.1.0"
 [dependencies]
 env_logger = "0.10.0"
 game = {path = "game"}
-# hot-lib-reloader = "^0.6"
-hot-lib-reloader = {path = "../hot-lib-reloader-rs"}
+hot-lib-reloader = "^0.6"
+# hot-lib-reloader = {path = "../hot-lib-reloader-rs"}
 renderer = {path = "renderer"}
 
 [workspace]
-members = ["renderer", "game"]
+members = ["renderer", "game", "common"]
 resolver = "2"
 
 [profile.dev.package."*"]

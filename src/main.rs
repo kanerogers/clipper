@@ -9,7 +9,7 @@ use renderer::{
 };
 use winit::event_loop::ControlFlow;
 
-#[hot_lib_reloader::hot_module(dylib = "game", lib_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/target/debug"))]
+#[hot_lib_reloader::hot_module(dylib = "game")]
 mod hot_lib {
     hot_functions_from_file!("game/src/lib.rs");
 

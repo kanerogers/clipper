@@ -1,4 +1,4 @@
-use renderer::glam;
+use common::glam;
 use std::f32::consts::TAU;
 
 #[derive(Clone, Debug, Default)]
@@ -27,7 +27,7 @@ impl Default for Mesh {
 
 #[no_mangle]
 pub fn tick(game: &mut Game) {
-    let plane_rotation = glam::Quat::from_rotation_x(TAU / 4.0); // 90 degrees
+    let plane_rotation = glam::Quat::from_rotation_x(TAU / 2.0); // 90 degrees
     let plane_transform =
         glam::Affine3A::from_rotation_translation(plane_rotation, [-1.0, 0.0, 1.0].into());
 
