@@ -20,14 +20,10 @@ pub fn init() -> (LazyVulkan, LazyRenderer, EventLoop<()>) {
     env_logger::init();
 
     // Alright, let's build some stuff
-    let (lazy_vulkan, mut lazy_renderer, event_loop) = LazyVulkan::builder()
+    let (lazy_vulkan, lazy_renderer, event_loop) = LazyVulkan::builder()
         .with_present(true)
         .window_size([1000, 1000])
         .build();
-
-    lazy_renderer.camera.position.y = 2.;
-    lazy_renderer.camera.position.z = 10.;
-    lazy_renderer.camera.pitch = -15_f32.to_radians();
 
     (lazy_vulkan, lazy_renderer, event_loop)
 }
@@ -69,6 +65,7 @@ fn main() {
                     hot_lib::tick(&mut game);
                 }
 
+                renderer.camera = game.camera;
                 renderer.render(&lazy_vulkan.context(), framebuffer_index, &game.meshes);
                 lazy_vulkan
                     .render_end(framebuffer_index, &[lazy_vulkan.present_complete_semaphore]);
@@ -115,7 +112,7 @@ fn handle_keypress(game: &mut game::Game, keyboard_input: winit::event::Keyboard
         (ElementState::Released, Some(VirtualKeyCode::Space)) => game_input.movement.y = 0.,
         (ElementState::Pressed, Some(VirtualKeyCode::C)) => game_input.movement.y = -1.,
         (ElementState::Released, Some(VirtualKeyCode::C)) => game_input.movement.y = 0.,
-        (ElementState::Pressed, Some(VirtualKeyCode::Escape)) => *game = Default::default(),
+        (ElementState::Pressed, Some(VirtualKeyCode::Escape)) => *game = hot_lib::Game::new(),
         _ => {}
     }
 }

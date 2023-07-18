@@ -5,7 +5,7 @@ use crate::{
     vulkan_texture::{VulkanTexture, VulkanTextureCreateInfo},
     LazyVulkanBuilder, Vertex,
 };
-use common::{glam, Geometry, Mesh};
+use common::{glam, Camera, Geometry, Mesh};
 use glam::{Vec2, Vec4};
 use std::ffi::CStr;
 
@@ -84,20 +84,6 @@ impl RenderSurface {
         self.depth_buffers.drain(..).for_each(|d| {
             d.destory(device);
         });
-    }
-}
-
-#[derive(Clone, Default)]
-pub struct Camera {
-    pub position: glam::Vec3,
-    pub pitch: f32,
-    pub yaw: f32,
-}
-
-impl Camera {
-    pub fn matrix(&self) -> glam::Affine3A {
-        let rotation = glam::Quat::from_euler(glam::EulerRot::YXZ, self.yaw, self.pitch, 0.);
-        glam::Affine3A::from_rotation_translation(rotation, self.position).inverse()
     }
 }
 

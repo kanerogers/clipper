@@ -2,7 +2,7 @@ pub mod time;
 
 use common::{
     glam::{Affine3A, Quat, Vec3},
-    Geometry, Mesh,
+    Camera, Geometry, Mesh,
 };
 use std::f32::consts::TAU;
 use time::Time;
@@ -15,18 +15,23 @@ pub struct Game {
     pub time: Time,
     pub dave: Dave,
     pub input: Input,
+    pub camera: Camera,
 }
 
 // objectively terrible input handling
 #[derive(Clone, Debug)]
 pub struct Input {
     pub movement: Vec3,
+    pub camera_pitch: f32,
+    pub camera_yaw: f32,
 }
 
 impl Default for Input {
     fn default() -> Self {
         Self {
             movement: Vec3::ZERO,
+            camera_pitch: 0.,
+            camera_yaw: 0.,
         }
     }
 }
@@ -39,7 +44,17 @@ impl Input {
 
 impl Game {
     pub fn new() -> Self {
-        Self::default()
+        let mut camera = Camera::default();
+        let dave = Dave::default();
+        camera.position.y = 3.;
+        camera.position.z = 12.;
+        camera.pitch = -15_f32.to_radians();
+        camera.focus_point = dave.position;
+        Self {
+            camera,
+            dave,
+            ..Default::default()
+        }
     }
 }
 
@@ -77,7 +92,7 @@ fn get_grid() -> Vec<Mesh> {
     let plane_rotation = Quat::from_rotation_x(TAU / 4.0); // 90 degrees
     let mut meshes = Vec::new();
 
-    let grid_size = 8;
+    let grid_size = 32;
     let square_size = 1.0;
 
     for row in 0..grid_size {
@@ -108,17 +123,32 @@ pub fn dave(game: &mut Game) {
 
     game.dave.update(dt, &game.input);
     game.meshes.push(Mesh {
-        geometry: Geometry::Cube,
+        geometry: Geometry::Sphere,
         transform: Affine3A::from_rotation_translation(sphere_rotation, game.dave.position),
         colour: Some([0., 0., 0.9].into()),
         ..Default::default()
     });
 }
+pub fn update_focus(camera: &mut Camera) {
+    let focus_radius = 1.0;
+    let distance = camera.target.distance(camera.focus_point);
+    if distance > focus_radius {
+        camera.focus_point = camera
+            .target
+            .lerp(camera.focus_point, focus_radius / distance);
+    }
+
+    camera.position = camera.focus_point - Vec3::new(0., -10., -10.);
+}
 
 #[no_mangle]
 pub fn tick(game: &mut Game) {
     while game.time.start_update() {
+        game.camera.pitch = -(TAU / 8.0);
         game.meshes = get_grid();
         dave(game);
+
+        game.camera.target = game.dave.position;
+        update_focus(&mut game.camera);
     }
 }
