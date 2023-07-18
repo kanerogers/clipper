@@ -34,6 +34,7 @@ pub fn init() -> (LazyVulkan, LazyRenderer, EventLoop<()>) {
         .initial_vertices(&vertices)
         .initial_indices(&indices)
         .with_present(true)
+        .window_size([1000, 1000])
         .build();
 
     lazy_renderer.camera.position.y = 2.;

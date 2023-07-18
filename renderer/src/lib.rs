@@ -77,8 +77,8 @@ impl LazyVulkanBuilder {
         self
     }
 
-    pub fn window_size(mut self, extent: vk::Extent2D) -> Self {
-        self.window_size = Some(extent);
+    pub fn window_size(mut self, extent: [u32; 2]) -> Self {
+        self.window_size = Some(vk::Extent2D { width: extent[0], height: extent[1]});
         self
     }
 
