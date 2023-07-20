@@ -1,6 +1,7 @@
 pub mod time;
 
 use common::{
+    bitflags::bitflags,
     glam::{vec3, Affine3A, Quat, Vec3},
     Camera, Geometry, Mesh,
 };
@@ -20,17 +21,38 @@ pub struct Game {
     pub camera: Camera,
 }
 
-// objectively terrible input handling
+bitflags! {
+    #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    pub struct Keys: u8 {
+        const W = 0b00000001;
+        const A = 0b00000010;
+        const S = 0b00000100;
+        const D = 0b00001000;
+        const Q = 0b00010000;
+        const E = 0b00100000;
+        const C = 0b01000000;
+        const Space = 0b10000000;
+    }
+}
+
+impl Keys {
+    pub fn as_axis(&self, negative: Keys, positive: Keys) -> f32 {
+        let negative = self.contains(negative) as i8 as f32;
+        let positive = self.contains(positive) as i8 as f32;
+        positive - negative
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Input {
-    pub keyboard_state: u8,
+    pub keyboard_state: Keys,
     pub camera_zoom: f32,
 }
 
 impl Default for Input {
     fn default() -> Self {
         Self {
-            keyboard_state: 0,
+            keyboard_state: Default::default(),
             camera_zoom: 0.,
         }
     }
@@ -70,9 +92,9 @@ pub struct Dave {
 impl Dave {
     pub fn update(&mut self, dt: f32, input: &Input, camera_transform: &Affine3A) {
         let input_movement = vec3(
-            ((input.keyboard_state >> 1) & 1) as f32 - ((input.keyboard_state >> 0) & 1) as f32,
-            ((input.keyboard_state >> 4) & 1) as f32 - ((input.keyboard_state >> 5) & 1) as f32,
-            ((input.keyboard_state >> 3) & 1) as f32 - ((input.keyboard_state >> 2) & 1) as f32,
+            input.keyboard_state.as_axis(Keys::A, Keys::D),
+            input.keyboard_state.as_axis(Keys::C, Keys::Space),
+            input.keyboard_state.as_axis(Keys::W, Keys::S),
         )
         .normalize();
         // Camera relative controls
@@ -171,8 +193,7 @@ pub fn update_camera(game: &mut Game) {
     }
     camera.focus_point = camera.target.lerp(camera.focus_point, t);
 
-    let camera_rotate =
-        ((input.keyboard_state >> 6) & 1) as f32 - ((input.keyboard_state >> 7) & 1) as f32;
+    let camera_rotate = input.keyboard_state.as_axis(Keys::E, Keys::Q);
     camera.yaw += camera_rotate * CAMERA_ROTATE_SPEED * dt;
 
     set_camera_distance(input, camera, dt);

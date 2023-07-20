@@ -114,23 +114,56 @@ fn handle_keypress(game: &mut game::Game, keyboard_input: winit::event::Keyboard
         state,
         ..
     } = keyboard_input;
+    use game::Keys;
     match (state, virtual_keycode) {
-        (ElementState::Pressed, Some(VirtualKeyCode::A)) => game_input.keyboard_state |= 0x01,
-        (ElementState::Released, Some(VirtualKeyCode::A)) => game_input.keyboard_state &= !0x01,
-        (ElementState::Pressed, Some(VirtualKeyCode::D)) => game_input.keyboard_state |= 0x02,
-        (ElementState::Released, Some(VirtualKeyCode::D)) => game_input.keyboard_state &= !0x02,
-        (ElementState::Pressed, Some(VirtualKeyCode::W)) => game_input.keyboard_state |= 0x04,
-        (ElementState::Released, Some(VirtualKeyCode::W)) => game_input.keyboard_state &= !0x04,
-        (ElementState::Pressed, Some(VirtualKeyCode::S)) => game_input.keyboard_state |= 0x08,
-        (ElementState::Released, Some(VirtualKeyCode::S)) => game_input.keyboard_state &= !0x08,
-        (ElementState::Pressed, Some(VirtualKeyCode::Space)) => game_input.keyboard_state |= 0x10,
-        (ElementState::Released, Some(VirtualKeyCode::Space)) => game_input.keyboard_state &= !0x10,
-        (ElementState::Pressed, Some(VirtualKeyCode::C)) => game_input.keyboard_state |= 0x20,
-        (ElementState::Released, Some(VirtualKeyCode::C)) => game_input.keyboard_state &= !0x20,
-        (ElementState::Pressed, Some(VirtualKeyCode::Q)) => game_input.keyboard_state |= 0x40,
-        (ElementState::Released, Some(VirtualKeyCode::Q)) => game_input.keyboard_state &= !0x40,
-        (ElementState::Pressed, Some(VirtualKeyCode::E)) => game_input.keyboard_state |= 0x80,
-        (ElementState::Released, Some(VirtualKeyCode::E)) => game_input.keyboard_state &= !0x80,
+        (ElementState::Pressed, Some(VirtualKeyCode::A)) => {
+            game_input.keyboard_state.insert(Keys::A)
+        }
+        (ElementState::Released, Some(VirtualKeyCode::A)) => {
+            game_input.keyboard_state.remove(Keys::A)
+        }
+        (ElementState::Pressed, Some(VirtualKeyCode::D)) => {
+            game_input.keyboard_state.insert(Keys::D)
+        }
+        (ElementState::Released, Some(VirtualKeyCode::D)) => {
+            game_input.keyboard_state.remove(Keys::D)
+        }
+        (ElementState::Pressed, Some(VirtualKeyCode::W)) => {
+            game_input.keyboard_state.insert(Keys::W)
+        }
+        (ElementState::Released, Some(VirtualKeyCode::W)) => {
+            game_input.keyboard_state.remove(Keys::W)
+        }
+        (ElementState::Pressed, Some(VirtualKeyCode::S)) => {
+            game_input.keyboard_state.insert(Keys::S)
+        }
+        (ElementState::Released, Some(VirtualKeyCode::S)) => {
+            game_input.keyboard_state.remove(Keys::S)
+        }
+        (ElementState::Pressed, Some(VirtualKeyCode::Space)) => {
+            game_input.keyboard_state.insert(Keys::Space)
+        }
+        (ElementState::Released, Some(VirtualKeyCode::Space)) => {
+            game_input.keyboard_state.remove(Keys::Space)
+        }
+        (ElementState::Pressed, Some(VirtualKeyCode::C)) => {
+            game_input.keyboard_state.insert(Keys::C)
+        }
+        (ElementState::Released, Some(VirtualKeyCode::C)) => {
+            game_input.keyboard_state.remove(Keys::C)
+        }
+        (ElementState::Pressed, Some(VirtualKeyCode::Q)) => {
+            game_input.keyboard_state.insert(Keys::Q)
+        }
+        (ElementState::Released, Some(VirtualKeyCode::Q)) => {
+            game_input.keyboard_state.remove(Keys::Q)
+        }
+        (ElementState::Pressed, Some(VirtualKeyCode::E)) => {
+            game_input.keyboard_state.insert(Keys::E)
+        }
+        (ElementState::Released, Some(VirtualKeyCode::E)) => {
+            game_input.keyboard_state.remove(Keys::E)
+        }
         (ElementState::Pressed, Some(VirtualKeyCode::Escape)) => *game = hot_lib::Game::new(),
         _ => {}
     }
