@@ -49,6 +49,12 @@ fn main() {
             } => {
                 handle_keypress(&mut game, input);
             }
+            Event::WindowEvent {
+                event: WindowEvent::MouseWheel { delta, .. },
+                ..
+            } => {
+                handle_mousewheel(&mut game, delta);
+            }
             Event::NewEvents(cause) => {
                 if cause == winit::event::StartCause::Init {
                     winit_initializing = true;
@@ -63,6 +69,7 @@ fn main() {
                 {
                     game.time.start_frame();
                     hot_lib::tick(&mut game);
+                    game.input.camera_zoom = 0.;
                 }
 
                 renderer.camera = game.camera;
@@ -92,6 +99,14 @@ fn main() {
     }
 }
 
+fn handle_mousewheel(game: &mut game::Game, delta: winit::event::MouseScrollDelta) {
+    let scroll_amount = match delta {
+        winit::event::MouseScrollDelta::LineDelta(_, scroll_y) => -scroll_y,
+        _ => todo!(),
+    };
+    game.input.camera_zoom += scroll_amount;
+}
+
 fn handle_keypress(game: &mut game::Game, keyboard_input: winit::event::KeyboardInput) -> () {
     let game_input = &mut game.input;
     let KeyboardInput {
@@ -112,6 +127,10 @@ fn handle_keypress(game: &mut game::Game, keyboard_input: winit::event::Keyboard
         (ElementState::Released, Some(VirtualKeyCode::Space)) => game_input.movement.y = 0.,
         (ElementState::Pressed, Some(VirtualKeyCode::C)) => game_input.movement.y = -1.,
         (ElementState::Released, Some(VirtualKeyCode::C)) => game_input.movement.y = 0.,
+        (ElementState::Pressed, Some(VirtualKeyCode::Q)) => game_input.camera_rotate = 1.,
+        (ElementState::Released, Some(VirtualKeyCode::Q)) => game_input.camera_rotate = 0.,
+        (ElementState::Pressed, Some(VirtualKeyCode::E)) => game_input.camera_rotate = -1.,
+        (ElementState::Released, Some(VirtualKeyCode::E)) => game_input.camera_rotate = 0.,
         (ElementState::Pressed, Some(VirtualKeyCode::Escape)) => *game = hot_lib::Game::new(),
         _ => {}
     }
