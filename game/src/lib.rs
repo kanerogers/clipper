@@ -49,7 +49,7 @@ impl Game {
                 Human::new([-3., 1., 0.].into()),
                 Human::new([0., 1., 2.].into()),
             ],
-            beacons: vec![Beacon::new([5., 4., 0.].into())],
+            beacons: vec![Beacon::new([15., 4., 0.].into())],
             ..Default::default()
         }
     }
@@ -110,7 +110,7 @@ fn get_grid() -> Vec<Mesh> {
     let plane_rotation = Quat::from_rotation_x(TAU / 4.0); // 90 degrees
     let mut meshes = Vec::new();
 
-    let grid_size = 32;
+    let grid_size = 64;
     let square_size = 2.0;
 
     for row in 0..grid_size {
