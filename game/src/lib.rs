@@ -1,23 +1,65 @@
+pub mod beacon;
+pub mod dave;
+pub mod human;
 pub mod time;
 
+use beacon::Beacon;
+pub use common::Mesh;
 use common::{
     glam::{Affine3A, Quat, Vec3},
-    Camera, Geometry, Mesh,
+    Camera, Geometry,
 };
+use dave::Dave;
+use human::{humans, Human};
 use std::f32::consts::TAU;
 use time::Time;
 
-const PLAYER_SPEED: f32 = 7.;
-const CAMERA_ZOOM_SPEED: f32 = 10.;
-const CAMERA_ROTATE_SPEED: f32 = 3.;
+pub const PLAYER_SPEED: f32 = 7.;
+pub const CAMERA_ZOOM_SPEED: f32 = 10.;
+pub const CAMERA_ROTATE_SPEED: f32 = 3.;
 
 #[derive(Clone, Debug, Default)]
 pub struct Game {
-    pub meshes: Vec<Mesh>,
     pub time: Time,
     pub dave: Dave,
     pub input: Input,
     pub camera: Camera,
+    pub terrain: Vec<Mesh>,
+    pub humans: Vec<Human>,
+    pub beacons: Vec<Beacon>,
+}
+
+impl Game {
+    pub fn new() -> Self {
+        let mut camera = Camera::default();
+        let dave = Dave::default();
+        camera.position.y = 3.;
+        camera.position.z = 12.;
+        camera.focus_point = dave.position;
+        camera.distance = 10.;
+        camera.desired_distance = camera.distance;
+        camera.start_distance = camera.distance;
+        Self {
+            camera,
+            dave,
+            terrain: get_grid(),
+            humans: vec![
+                Human::new([0., 1., 4.].into()),
+                Human::new([-3., 1., 0.].into()),
+                Human::new([0., 1., 2.].into()),
+            ],
+            beacons: vec![Beacon::new([5., 4., 0.].into())],
+            ..Default::default()
+        }
+    }
+
+    pub fn meshes(&self) -> Vec<Mesh> {
+        let mut meshes = self.terrain.clone();
+        meshes.push(self.dave.mesh);
+        meshes.extend(self.humans.iter().map(|h| h.mesh));
+        meshes.extend(self.beacons.iter().map(|h| h.mesh));
+        meshes
+    }
 }
 
 // objectively terrible input handling
@@ -38,73 +80,6 @@ impl Default for Input {
     }
 }
 
-impl Input {
-    pub fn reset(&mut self) {
-        *self = Default::default();
-    }
-}
-
-impl Game {
-    pub fn new() -> Self {
-        let mut camera = Camera::default();
-        let dave = Dave::default();
-        camera.position.y = 3.;
-        camera.position.z = 12.;
-        camera.focus_point = dave.position;
-        camera.distance = 10.;
-        camera.desired_distance = camera.distance;
-        camera.start_distance = camera.distance;
-        Self {
-            camera,
-            dave,
-            meshes: get_grid(),
-            ..Default::default()
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct Dave {
-    pub position: Vec3,
-    pub velocity: Vec3,
-}
-
-impl Dave {
-    pub fn update(&mut self, dt: f32, input: &Input, camera_transform: &Affine3A) {
-        // Camera relative controls
-        let mut forward = camera_transform.transform_vector3(Vec3::Z);
-        forward.y = 0.;
-        forward = forward.normalize();
-
-        let mut right = camera_transform.transform_vector3(Vec3::X);
-        right.y = 0.;
-        right = right.normalize();
-
-        let mut movement = forward * input.movement.z + right * input.movement.x;
-        movement.y = input.movement.y;
-        movement = movement.normalize();
-        self.velocity = if !movement.is_nan() {
-            movement
-        } else {
-            Vec3::ZERO
-        };
-
-        // Velocity, baby!
-        let displacement = self.velocity * PLAYER_SPEED * dt;
-        self.position += displacement;
-        self.position.y = self.position.y.min(5.).max(1.);
-    }
-}
-
-impl Default for Dave {
-    fn default() -> Self {
-        Self {
-            position: [0., 2., 0.].into(),
-            velocity: Default::default(),
-        }
-    }
-}
-
 fn get_grid() -> Vec<Mesh> {
     let plane_rotation = Quat::from_rotation_x(TAU / 4.0); // 90 degrees
     let mut meshes = Vec::new();
@@ -116,15 +91,10 @@ fn get_grid() -> Vec<Mesh> {
         for column in 0..grid_size {
             let x = (column as f32) * square_size - (grid_size as f32 * square_size / 2.0);
             let y = (row as f32) * square_size - (grid_size as f32 * square_size / 2.0);
-            // let colour = if column == 0 || row == 0 {
-            //     [0.5, 0.3, 0.1]
-            // } else {
-            //     [0., 0.8, 0.0]
-            // };
             let colour = if (column + row) % 2 > 0 {
                 [0.5, 0.3, 0.1] // brown
             } else {
-                [0., 0.8, 0.0] // green
+                [1., 1., 1.]
             };
 
             meshes.push(Mesh {
@@ -140,16 +110,8 @@ fn get_grid() -> Vec<Mesh> {
 }
 
 pub fn dave(game: &mut Game) {
-    let sphere_rotation = Quat::from_rotation_y(TAU / 8.0);
     let dt = game.time.delta();
-
     game.dave.update(dt, &game.input, &game.camera.transform());
-    *game.meshes.last_mut().unwrap() = Mesh {
-        geometry: Geometry::Sphere,
-        transform: Affine3A::from_rotation_translation(sphere_rotation, game.dave.position),
-        colour: Some([0., 0., 0.9].into()),
-        ..Default::default()
-    };
 }
 pub fn update_camera(game: &mut Game) {
     let camera = &mut game.camera;
@@ -183,7 +145,6 @@ pub fn update_camera(game: &mut Game) {
 
 fn set_camera_distance(input: &Input, camera: &mut Camera, dt: f32) {
     if input.camera_zoom.abs() > 0. {
-        println!("camera zoom: {}", input.camera_zoom);
         camera.start_distance = camera.distance;
         camera.desired_distance += input.camera_zoom;
         camera.desired_distance = camera.desired_distance.max(5.).min(50.);
@@ -200,10 +161,20 @@ fn set_camera_distance(input: &Input, camera: &mut Camera, dt: f32) {
 }
 
 #[no_mangle]
-pub fn tick(game: &mut Game) {
+pub fn tick(game: &mut Game) -> Vec<Mesh> {
     while game.time.start_update() {
         game.camera.target = game.dave.position;
         update_camera(game);
         dave(game);
+
+        humans(game);
     }
+
+    game.meshes()
+}
+
+// required due to reasons
+#[no_mangle]
+pub fn init() -> Game {
+    Game::new()
 }

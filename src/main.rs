@@ -13,7 +13,7 @@ use winit::event_loop::ControlFlow;
 mod hot_lib {
     hot_functions_from_file!("game/src/lib.rs");
 
-    pub use game::Game;
+    pub use game::{Game, Mesh};
 }
 
 pub fn init() -> (LazyVulkan, LazyRenderer, EventLoop<()>) {
@@ -30,7 +30,7 @@ pub fn init() -> (LazyVulkan, LazyRenderer, EventLoop<()>) {
 
 fn main() {
     let (mut lazy_vulkan, mut renderer, mut event_loop) = init();
-    let mut game = hot_lib::Game::new();
+    let mut game = hot_lib::init();
 
     // Off we go!
     let mut winit_initializing = true;
@@ -66,14 +66,15 @@ fn main() {
             Event::MainEventsCleared => {
                 let framebuffer_index = lazy_vulkan.render_begin();
 
-                {
+                let meshes = {
                     game.time.start_frame();
-                    hot_lib::tick(&mut game);
-                    game.input.camera_zoom = 0.;
-                }
+                    hot_lib::tick(&mut game)
+                };
+
+                game.input.camera_zoom = 0.;
 
                 renderer.camera = game.camera;
-                renderer.render(&lazy_vulkan.context(), framebuffer_index, &game.meshes);
+                renderer.render(&lazy_vulkan.context(), framebuffer_index, &meshes);
                 lazy_vulkan
                     .render_end(framebuffer_index, &[lazy_vulkan.present_complete_semaphore]);
             }
@@ -131,7 +132,7 @@ fn handle_keypress(game: &mut game::Game, keyboard_input: winit::event::Keyboard
         (ElementState::Released, Some(VirtualKeyCode::Q)) => game_input.camera_rotate = 0.,
         (ElementState::Pressed, Some(VirtualKeyCode::E)) => game_input.camera_rotate = -1.,
         (ElementState::Released, Some(VirtualKeyCode::E)) => game_input.camera_rotate = 0.,
-        (ElementState::Pressed, Some(VirtualKeyCode::Escape)) => *game = hot_lib::Game::new(),
+        (ElementState::Pressed, Some(VirtualKeyCode::Escape)) => *game = hot_lib::init(),
         _ => {}
     }
 }

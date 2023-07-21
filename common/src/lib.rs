@@ -1,4 +1,5 @@
 pub use glam;
+pub use rand;
 
 #[derive(Clone, Debug, Copy)]
 pub struct Mesh {
