@@ -6,6 +6,7 @@ pub mod time;
 use beacon::Beacon;
 pub use common::Mesh;
 use common::{
+    bitflags::bitflags,
     glam::{Affine3A, Quat, Vec3},
     Camera, Geometry,
 };
@@ -62,21 +63,46 @@ impl Game {
     }
 }
 
-// objectively terrible input handling
+bitflags! {
+    #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    pub struct Keys: u8 {
+        const W = 0b00000001;
+        const A = 0b00000010;
+        const S = 0b00000100;
+        const D = 0b00001000;
+        const Q = 0b00010000;
+        const E = 0b00100000;
+        const C = 0b01000000;
+        const Space = 0b10000000;
+    }
+}
+
+impl Keys {
+    pub fn as_axis(&self, negative: Keys, positive: Keys) -> f32 {
+        let negative = self.contains(negative) as i8 as f32;
+        let positive = self.contains(positive) as i8 as f32;
+        positive - negative
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Input {
-    pub movement: Vec3,
-    pub camera_rotate: f32,
+    pub keyboard_state: Keys,
     pub camera_zoom: f32,
 }
 
 impl Default for Input {
     fn default() -> Self {
         Self {
-            movement: Vec3::ZERO,
-            camera_rotate: 0.,
+            keyboard_state: Default::default(),
             camera_zoom: 0.,
         }
+    }
+}
+
+impl Input {
+    pub fn reset(&mut self) {
+        *self = Default::default();
     }
 }
 
@@ -131,7 +157,8 @@ pub fn update_camera(game: &mut Game) {
     }
     camera.focus_point = camera.target.lerp(camera.focus_point, t);
 
-    camera.yaw += input.camera_rotate * CAMERA_ROTATE_SPEED * dt;
+    let camera_rotate = input.keyboard_state.as_axis(Keys::E, Keys::Q);
+    camera.yaw += camera_rotate * CAMERA_ROTATE_SPEED * dt;
 
     set_camera_distance(input, camera, dt);
 
@@ -147,7 +174,7 @@ fn set_camera_distance(input: &Input, camera: &mut Camera, dt: f32) {
     if input.camera_zoom.abs() > 0. {
         camera.start_distance = camera.distance;
         camera.desired_distance += input.camera_zoom;
-        camera.desired_distance = camera.desired_distance.max(5.).min(50.);
+        camera.desired_distance = camera.desired_distance.clamp(5., 50.);
     }
 
     let current_delta = camera.desired_distance - camera.distance;

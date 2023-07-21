@@ -3,7 +3,7 @@ use common::{
     Geometry, Mesh,
 };
 
-use crate::{Input, PLAYER_SPEED};
+use crate::{Input, Keys, PLAYER_SPEED};
 
 #[derive(Clone, Debug)]
 pub struct Dave {
@@ -14,6 +14,13 @@ pub struct Dave {
 
 impl Dave {
     pub fn update(&mut self, dt: f32, input: &Input, camera_transform: &Affine3A) {
+        let input_movement = Vec3::new(
+            input.keyboard_state.as_axis(Keys::A, Keys::D),
+            input.keyboard_state.as_axis(Keys::C, Keys::Space),
+            input.keyboard_state.as_axis(Keys::W, Keys::S),
+        )
+        .normalize();
+
         // Camera relative controls
         let mut forward = camera_transform.transform_vector3(Vec3::Z);
         forward.y = 0.;
@@ -23,14 +30,12 @@ impl Dave {
         right.y = 0.;
         right = right.normalize();
 
-        let mut movement = forward * input.movement.z + right * input.movement.x;
-        movement.y = input.movement.y;
-        movement = movement.normalize();
-        self.velocity = if !movement.is_nan() {
-            movement
-        } else {
-            Vec3::ZERO
-        };
+        let mut movement = forward * input_movement.z + right * input_movement.x;
+        movement = movement.normalize_or_zero();
+        movement.y = input_movement.y;
+        movement = movement.normalize_or_zero();
+
+        self.velocity = self.velocity.lerp(movement, 0.1);
 
         // Velocity, baby!
         let displacement = self.velocity * PLAYER_SPEED * dt;

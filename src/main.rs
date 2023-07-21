@@ -13,7 +13,7 @@ use winit::event_loop::ControlFlow;
 mod hot_lib {
     hot_functions_from_file!("game/src/lib.rs");
 
-    pub use game::{Game, Mesh};
+    pub use game::{Game, Keys, Mesh};
 }
 
 pub fn init() -> (LazyVulkan, LazyRenderer, EventLoop<()>) {
@@ -100,7 +100,7 @@ fn main() {
     }
 }
 
-fn handle_mousewheel(game: &mut game::Game, delta: winit::event::MouseScrollDelta) {
+fn handle_mousewheel(game: &mut hot_lib::Game, delta: winit::event::MouseScrollDelta) {
     let scroll_amount = match delta {
         winit::event::MouseScrollDelta::LineDelta(_, scroll_y) => -scroll_y,
         _ => todo!(),
@@ -108,7 +108,8 @@ fn handle_mousewheel(game: &mut game::Game, delta: winit::event::MouseScrollDelt
     game.input.camera_zoom += scroll_amount;
 }
 
-fn handle_keypress(game: &mut game::Game, keyboard_input: winit::event::KeyboardInput) -> () {
+fn handle_keypress(game: &mut hot_lib::Game, keyboard_input: winit::event::KeyboardInput) -> () {
+    use hot_lib::Keys;
     let game_input = &mut game.input;
     let KeyboardInput {
         virtual_keycode,
@@ -116,22 +117,55 @@ fn handle_keypress(game: &mut game::Game, keyboard_input: winit::event::Keyboard
         ..
     } = keyboard_input;
     match (state, virtual_keycode) {
-        (ElementState::Pressed, Some(VirtualKeyCode::A)) => game_input.movement.x = -1.,
-        (ElementState::Released, Some(VirtualKeyCode::A)) => game_input.movement.x = 0.,
-        (ElementState::Pressed, Some(VirtualKeyCode::D)) => game_input.movement.x = 1.,
-        (ElementState::Released, Some(VirtualKeyCode::D)) => game_input.movement.x = 0.,
-        (ElementState::Pressed, Some(VirtualKeyCode::W)) => game_input.movement.z = -1.,
-        (ElementState::Released, Some(VirtualKeyCode::W)) => game_input.movement.z = 0.,
-        (ElementState::Pressed, Some(VirtualKeyCode::S)) => game_input.movement.z = 1.,
-        (ElementState::Released, Some(VirtualKeyCode::S)) => game_input.movement.z = 0.,
-        (ElementState::Pressed, Some(VirtualKeyCode::Space)) => game_input.movement.y = 1.,
-        (ElementState::Released, Some(VirtualKeyCode::Space)) => game_input.movement.y = 0.,
-        (ElementState::Pressed, Some(VirtualKeyCode::C)) => game_input.movement.y = -1.,
-        (ElementState::Released, Some(VirtualKeyCode::C)) => game_input.movement.y = 0.,
-        (ElementState::Pressed, Some(VirtualKeyCode::Q)) => game_input.camera_rotate = 1.,
-        (ElementState::Released, Some(VirtualKeyCode::Q)) => game_input.camera_rotate = 0.,
-        (ElementState::Pressed, Some(VirtualKeyCode::E)) => game_input.camera_rotate = -1.,
-        (ElementState::Released, Some(VirtualKeyCode::E)) => game_input.camera_rotate = 0.,
+        (ElementState::Pressed, Some(VirtualKeyCode::A)) => {
+            game_input.keyboard_state.insert(Keys::A)
+        }
+        (ElementState::Released, Some(VirtualKeyCode::A)) => {
+            game_input.keyboard_state.remove(Keys::A)
+        }
+        (ElementState::Pressed, Some(VirtualKeyCode::D)) => {
+            game_input.keyboard_state.insert(Keys::D)
+        }
+        (ElementState::Released, Some(VirtualKeyCode::D)) => {
+            game_input.keyboard_state.remove(Keys::D)
+        }
+        (ElementState::Pressed, Some(VirtualKeyCode::W)) => {
+            game_input.keyboard_state.insert(Keys::W)
+        }
+        (ElementState::Released, Some(VirtualKeyCode::W)) => {
+            game_input.keyboard_state.remove(Keys::W)
+        }
+        (ElementState::Pressed, Some(VirtualKeyCode::S)) => {
+            game_input.keyboard_state.insert(Keys::S)
+        }
+        (ElementState::Released, Some(VirtualKeyCode::S)) => {
+            game_input.keyboard_state.remove(Keys::S)
+        }
+        (ElementState::Pressed, Some(VirtualKeyCode::Space)) => {
+            game_input.keyboard_state.insert(Keys::Space)
+        }
+        (ElementState::Released, Some(VirtualKeyCode::Space)) => {
+            game_input.keyboard_state.remove(Keys::Space)
+        }
+        (ElementState::Pressed, Some(VirtualKeyCode::C)) => {
+            game_input.keyboard_state.insert(Keys::C)
+        }
+        (ElementState::Released, Some(VirtualKeyCode::C)) => {
+            game_input.keyboard_state.remove(Keys::C)
+        }
+        (ElementState::Pressed, Some(VirtualKeyCode::Q)) => {
+            game_input.keyboard_state.insert(Keys::Q)
+        }
+        (ElementState::Released, Some(VirtualKeyCode::Q)) => {
+            game_input.keyboard_state.remove(Keys::Q)
+        }
+        (ElementState::Pressed, Some(VirtualKeyCode::E)) => {
+            game_input.keyboard_state.insert(Keys::E)
+        }
+        (ElementState::Released, Some(VirtualKeyCode::E)) => {
+            game_input.keyboard_state.remove(Keys::E)
+        }
+
         (ElementState::Pressed, Some(VirtualKeyCode::Escape)) => *game = hot_lib::init(),
         _ => {}
     }
