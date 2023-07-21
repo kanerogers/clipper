@@ -1,7 +1,8 @@
 pub mod time;
 
 use common::{
-    glam::{Affine3A, Quat, Vec3},
+    bitflags::bitflags,
+    glam::{vec3, Affine3A, Quat, Vec3},
     Camera, Geometry, Mesh,
 };
 use std::f32::consts::TAU;
@@ -20,19 +21,38 @@ pub struct Game {
     pub camera: Camera,
 }
 
-// objectively terrible input handling
+bitflags! {
+    #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    pub struct Keys: u8 {
+        const W = 0b00000001;
+        const A = 0b00000010;
+        const S = 0b00000100;
+        const D = 0b00001000;
+        const Q = 0b00010000;
+        const E = 0b00100000;
+        const C = 0b01000000;
+        const Space = 0b10000000;
+    }
+}
+
+impl Keys {
+    pub fn as_axis(&self, negative: Keys, positive: Keys) -> f32 {
+        let negative = self.contains(negative) as i8 as f32;
+        let positive = self.contains(positive) as i8 as f32;
+        positive - negative
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Input {
-    pub movement: Vec3,
-    pub camera_rotate: f32,
+    pub keyboard_state: Keys,
     pub camera_zoom: f32,
 }
 
 impl Default for Input {
     fn default() -> Self {
         Self {
-            movement: Vec3::ZERO,
-            camera_rotate: 0.,
+            keyboard_state: Default::default(),
             camera_zoom: 0.,
         }
     }
@@ -71,6 +91,12 @@ pub struct Dave {
 
 impl Dave {
     pub fn update(&mut self, dt: f32, input: &Input, camera_transform: &Affine3A) {
+        let input_movement = vec3(
+            input.keyboard_state.as_axis(Keys::A, Keys::D),
+            input.keyboard_state.as_axis(Keys::C, Keys::Space),
+            input.keyboard_state.as_axis(Keys::W, Keys::S),
+        )
+        .normalize();
         // Camera relative controls
         let mut forward = camera_transform.transform_vector3(Vec3::Z);
         forward.y = 0.;
@@ -80,19 +106,17 @@ impl Dave {
         right.y = 0.;
         right = right.normalize();
 
-        let mut movement = forward * input.movement.z + right * input.movement.x;
-        movement.y = input.movement.y;
-        movement = movement.normalize();
-        self.velocity = if !movement.is_nan() {
-            movement
-        } else {
-            Vec3::ZERO
-        };
+        let mut movement = forward * input_movement.z + right * input_movement.x;
+        movement = movement.normalize_or_zero();
+        movement.y = input_movement.y;
+        movement = movement.normalize_or_zero();
+
+        self.velocity = self.velocity.lerp(movement, 0.1);
 
         // Velocity, baby!
         let displacement = self.velocity * PLAYER_SPEED * dt;
         self.position += displacement;
-        self.position.y = self.position.y.min(5.).max(1.);
+        self.position.y = self.position.y.clamp(1., 5.);
     }
 }
 
@@ -169,7 +193,8 @@ pub fn update_camera(game: &mut Game) {
     }
     camera.focus_point = camera.target.lerp(camera.focus_point, t);
 
-    camera.yaw += input.camera_rotate * CAMERA_ROTATE_SPEED * dt;
+    let camera_rotate = input.keyboard_state.as_axis(Keys::E, Keys::Q);
+    camera.yaw += camera_rotate * CAMERA_ROTATE_SPEED * dt;
 
     set_camera_distance(input, camera, dt);
 
@@ -186,7 +211,7 @@ fn set_camera_distance(input: &Input, camera: &mut Camera, dt: f32) {
         println!("camera zoom: {}", input.camera_zoom);
         camera.start_distance = camera.distance;
         camera.desired_distance += input.camera_zoom;
-        camera.desired_distance = camera.desired_distance.max(5.).min(50.);
+        camera.desired_distance = camera.desired_distance.clamp(5., 50.);
     }
 
     let current_delta = camera.desired_distance - camera.distance;
