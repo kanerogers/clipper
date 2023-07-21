@@ -172,9 +172,17 @@ impl State {
 pub fn humans(game: &mut Game) {
     let dt = game.time.delta();
     let dave_position = game.dave.position;
+    let gui_state = &mut game.gui_state;
+    gui_state.paperclips = 0;
+    gui_state.workers = 0;
     for human in &mut game.humans {
         let nearest_beacon = find_nearest_beacon(human.position, &mut game.beacons);
         human.update(dt, dave_position, nearest_beacon);
+
+        match &human.state {
+            State::Working => gui_state.workers += 1,
+            _ => {},
+        }
     }
 }
 

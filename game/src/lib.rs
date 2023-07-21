@@ -8,7 +8,7 @@ pub use common::Mesh;
 use common::{
     bitflags::bitflags,
     glam::{Affine3A, Quat, Vec3},
-    Camera, Geometry,
+    Camera, GUIState, Geometry,
 };
 use dave::Dave;
 use human::{humans, Human};
@@ -28,6 +28,7 @@ pub struct Game {
     pub terrain: Vec<Mesh>,
     pub humans: Vec<Human>,
     pub beacons: Vec<Beacon>,
+    pub gui_state: GUIState,
 }
 
 impl Game {
@@ -110,29 +111,24 @@ fn get_grid() -> Vec<Mesh> {
     let plane_rotation = Quat::from_rotation_x(TAU / 4.0); // 90 degrees
     let mut meshes = Vec::new();
 
-    let grid_size = 64;
-    let square_size = 2.0;
+    let grid_size = 255;
 
-    for row in 0..grid_size {
-        for column in 0..grid_size {
-            let x = (column as f32) * square_size - (grid_size as f32 * square_size / 2.0);
-            let y = (row as f32) * square_size - (grid_size as f32 * square_size / 2.0);
-            let colour = if (column + row) % 2 > 0 {
-                [0.5, 0.3, 0.1] // brown
-            } else {
-                [1., 1., 1.]
-            };
-
-            meshes.push(Mesh {
-                geometry: Geometry::Plane,
-                transform: Affine3A::from_rotation_translation(plane_rotation, [x, 0., y].into()),
-                colour: Some(colour.into()),
-                ..Default::default()
-            })
-        }
-    }
+    meshes.push(Mesh {
+        geometry: Geometry::Plane,
+        transform: Affine3A::from_scale_rotation_translation(
+            [grid_size as f32, grid_size as f32, 1. as f32].into(),
+            plane_rotation,
+            Default::default(),
+        ),
+        colour: Some(rgb_to_vec(11, 102, 35)),
+        ..Default::default()
+    });
 
     meshes
+}
+
+fn rgb_to_vec(r: usize, g: usize, b: usize) -> Vec3 {
+    [r as f32 / 255., g as f32 / 255., b as f32 / 255.].into()
 }
 
 pub fn dave(game: &mut Game) {
@@ -193,7 +189,6 @@ pub fn tick(game: &mut Game) -> Vec<Mesh> {
         game.camera.target = game.dave.position;
         update_camera(game);
         dave(game);
-
         humans(game);
     }
 

@@ -10,10 +10,17 @@ use renderer::{
 use winit::event_loop::ControlFlow;
 
 #[hot_lib_reloader::hot_module(dylib = "game", file_watch_debounce = 20)]
-mod hot_lib {
+mod hot_game {
     hot_functions_from_file!("game/src/lib.rs");
 
     pub use game::{Game, Keys, Mesh};
+}
+
+#[hot_lib_reloader::hot_module(dylib = "gui", file_watch_debounce = 20)]
+mod hot_gui {
+    hot_functions_from_file!("gui/src/lib.rs");
+
+    pub use gui::{yakui_vulkan, GUIState, GUI};
 }
 
 pub fn init() -> (LazyVulkan, LazyRenderer, EventLoop<()>) {
@@ -30,7 +37,10 @@ pub fn init() -> (LazyVulkan, LazyRenderer, EventLoop<()>) {
 
 fn main() {
     let (mut lazy_vulkan, mut renderer, mut event_loop) = init();
-    let mut game = hot_lib::init();
+
+    let (gui_vulkan_context, gui_render_surface) = get_gui_properties(&lazy_vulkan, &renderer);
+    let mut game = hot_game::init();
+    let mut gui = hot_gui::init(&gui_vulkan_context, gui_render_surface);
 
     // Off we go!
     let mut winit_initializing = true;
@@ -68,13 +78,21 @@ fn main() {
 
                 let meshes = {
                     game.time.start_frame();
-                    hot_lib::tick(&mut game)
+                    hot_game::tick(&mut game)
                 };
 
                 game.input.camera_zoom = 0.;
 
                 renderer.camera = game.camera;
                 renderer.render(&lazy_vulkan.context(), framebuffer_index, &meshes);
+
+                let (gui_vulkan_context, _) = get_gui_properties(&lazy_vulkan, &renderer);
+                hot_gui::paint(
+                    &mut gui,
+                    &game.gui_state,
+                    &gui_vulkan_context,
+                    framebuffer_index,
+                );
                 lazy_vulkan
                     .render_end(framebuffer_index, &[lazy_vulkan.present_complete_semaphore]);
             }
@@ -87,6 +105,9 @@ fn main() {
                 } else {
                     let new_render_surface = lazy_vulkan.resized(size.width, size.height);
                     renderer.update_surface(new_render_surface, &lazy_vulkan.context().device);
+                    let (gui_vulkan_context, gui_render_surface) =
+                        get_gui_properties(&lazy_vulkan, &renderer);
+                    hot_gui::resized(&mut gui, gui_render_surface, &gui_vulkan_context);
                 }
             }
 
@@ -100,7 +121,34 @@ fn main() {
     }
 }
 
-fn handle_mousewheel(game: &mut hot_lib::Game, delta: winit::event::MouseScrollDelta) {
+fn get_gui_properties<'a>(
+    lazy_vulkan: &'a LazyVulkan,
+    renderer: &LazyRenderer,
+) -> (
+    hot_gui::yakui_vulkan::VulkanContext<'a>,
+    hot_gui::yakui_vulkan::RenderSurface,
+) {
+    let vulkan_context = lazy_vulkan.context();
+    let gui_vulkan_context = hot_gui::yakui_vulkan::VulkanContext::new(
+        &vulkan_context.device,
+        vulkan_context.queue,
+        vulkan_context.draw_command_buffer,
+        vulkan_context.command_pool,
+        vulkan_context.memory_properties,
+    );
+
+    let render_surface = &renderer.render_surface;
+    let gui_render_surface = hot_gui::yakui_vulkan::RenderSurface {
+        resolution: render_surface.resolution,
+        format: render_surface.format,
+        image_views: render_surface.image_views.clone(),
+        load_op: hot_gui::yakui_vulkan::vk::AttachmentLoadOp::LOAD,
+    };
+
+    (gui_vulkan_context, gui_render_surface)
+}
+
+fn handle_mousewheel(game: &mut hot_game::Game, delta: winit::event::MouseScrollDelta) {
     let scroll_amount = match delta {
         winit::event::MouseScrollDelta::LineDelta(_, scroll_y) => -scroll_y,
         _ => todo!(),
@@ -108,8 +156,8 @@ fn handle_mousewheel(game: &mut hot_lib::Game, delta: winit::event::MouseScrollD
     game.input.camera_zoom += scroll_amount;
 }
 
-fn handle_keypress(game: &mut hot_lib::Game, keyboard_input: winit::event::KeyboardInput) -> () {
-    use hot_lib::Keys;
+fn handle_keypress(game: &mut hot_game::Game, keyboard_input: winit::event::KeyboardInput) -> () {
+    use hot_game::Keys;
     let game_input = &mut game.input;
     let KeyboardInput {
         virtual_keycode,
@@ -166,7 +214,7 @@ fn handle_keypress(game: &mut hot_lib::Game, keyboard_input: winit::event::Keybo
             game_input.keyboard_state.remove(Keys::E)
         }
 
-        (ElementState::Pressed, Some(VirtualKeyCode::Escape)) => *game = hot_lib::init(),
+        (ElementState::Pressed, Some(VirtualKeyCode::Escape)) => *game = hot_game::init(),
         _ => {}
     }
 }

@@ -50,3 +50,9 @@ impl Camera {
         glam::Affine3A::from_rotation_translation(rotation, self.position)
     }
 }
+
+#[derive(Debug, Clone, Default)]
+pub struct GUIState {
+    pub paperclips: usize,
+    pub workers: usize,
+}
