@@ -9,4 +9,4 @@ version = "0.1.0"
 common = {path = "../common"}
 
 [lib]
-crate-type = ["rlib", "dylib"]
+crate-type = ["dylib", "rlib"]

@@ -1,5 +1,7 @@
 pub use bitflags;
 pub use glam;
+use glam::Vec3;
+pub use hecs;
 pub use rand;
 
 #[derive(Clone, Debug, Copy)]
@@ -7,7 +9,7 @@ pub struct Mesh {
     pub geometry: Geometry,
     pub texture_id: u32,
     pub transform: glam::Affine3A,
-    pub colour: Option<glam::Vec3>,
+    pub colour: Option<Vec3>,
 }
 
 impl Default for Mesh {
@@ -26,6 +28,30 @@ pub enum Geometry {
     Plane,
     Sphere,
     Cube,
+}
+
+#[derive(Clone, Debug, Copy)]
+pub struct Material {
+    pub colour: glam::Vec3,
+    pub texture_id: u32,
+}
+
+impl Material {
+    pub fn from_colour(colour: glam::Vec3) -> Self {
+        Self {
+            colour,
+            ..Default::default()
+        }
+    }
+}
+
+impl Default for Material {
+    fn default() -> Self {
+        Self {
+            colour: Vec3::ONE,
+            texture_id: u32::MAX,
+        }
+    }
 }
 
 #[derive(Clone, Default, Debug, Copy)]

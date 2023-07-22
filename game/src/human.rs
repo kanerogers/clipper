@@ -170,20 +170,20 @@ impl State {
 }
 
 pub fn humans(game: &mut Game) {
-    let dt = game.time.delta();
-    let dave_position = game.dave.position;
-    let gui_state = &mut game.gui_state;
-    gui_state.paperclips = 0;
-    gui_state.workers = 0;
-    for human in &mut game.humans {
-        let nearest_beacon = find_nearest_beacon(human.position, &mut game.beacons);
-        human.update(dt, dave_position, nearest_beacon);
+    // let dt = game.time.delta();
+    // let dave_position = game.dave.position;
+    // let gui_state = &mut game.gui_state;
+    // gui_state.paperclips = 0;
+    // gui_state.workers = 0;
+    // for human in &mut game.humans {
+    //     let nearest_beacon = find_nearest_beacon(human.position, &mut game.beacons);
+    //     human.update(dt, dave_position, nearest_beacon);
 
-        match &human.state {
-            State::Working => gui_state.workers += 1,
-            _ => {},
-        }
-    }
+    //     match &human.state {
+    //         State::Working => gui_state.workers += 1,
+    //         _ => {},
+    //     }
+    // }
 }
 
 fn find_nearest_beacon(position: Vec3, beacons: &mut [Beacon]) -> Option<&mut Beacon> {

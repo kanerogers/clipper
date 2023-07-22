@@ -1,3 +1,8 @@
+use std::str::FromStr;
+
+use libloading::os::windows::{
+    LOAD_LIBRARY_SEARCH_DEFAULT_DIRS, LOAD_LIBRARY_SEARCH_USER_DIRS, LOAD_WITH_ALTERED_SEARCH_PATH,
+};
 use renderer::{
     winit::{
         self,
@@ -9,14 +14,14 @@ use renderer::{
 };
 use winit::event_loop::ControlFlow;
 
-#[hot_lib_reloader::hot_module(dylib = "game", file_watch_debounce = 20)]
+#[hot_lib_reloader::hot_module(dylib = "game", file_watch_debounce = 20, lib_dir = "target/debug")]
 mod hot_game {
     hot_functions_from_file!("game/src/lib.rs");
 
     pub use game::{Game, Keys, Mesh};
 }
 
-#[hot_lib_reloader::hot_module(dylib = "gui", file_watch_debounce = 20)]
+#[hot_lib_reloader::hot_module(dylib = "gui", file_watch_debounce = 20, lib_dir = "target/debug")]
 mod hot_gui {
     hot_functions_from_file!("gui/src/lib.rs");
 
@@ -36,11 +41,13 @@ pub fn init() -> (LazyVulkan, LazyRenderer, EventLoop<()>) {
 }
 
 fn main() {
+    println!("Uh, hello?");
+    load_libs();
     let (mut lazy_vulkan, mut renderer, mut event_loop) = init();
 
     let (gui_vulkan_context, gui_render_surface) = get_gui_properties(&lazy_vulkan, &renderer);
     let mut game = hot_game::init();
-    let mut gui = hot_gui::init(&gui_vulkan_context, gui_render_surface);
+    let mut gui = hot_gui::gui_init(&gui_vulkan_context, gui_render_surface);
 
     // Off we go!
     let mut winit_initializing = true;
@@ -118,6 +125,24 @@ fn main() {
     // I guess we better do this or else the Dreaded Validation Layers will complain
     unsafe {
         renderer.cleanup(&lazy_vulkan.context().device);
+    }
+}
+
+fn load_libs() {
+    use libloading::os::windows::Library;
+    unsafe {
+        let mut path = std::path::PathBuf::from_str("target/debug").unwrap();
+        path = path.canonicalize().unwrap();
+        println!("Adding {path:?} to search path");
+        Library::add_directory_to_search_path(path).unwrap();
+
+        println!("..done. Loading library..");
+        let absolute_dll_path = std::path::PathBuf::from_str("target/debug/game.dll")
+            .unwrap()
+            .canonicalize()
+            .unwrap();
+        Library::load_with_flags(absolute_dll_path, 0).unwrap();
+        println!("Success!");
     }
 }
 

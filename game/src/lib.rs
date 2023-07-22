@@ -1,4 +1,5 @@
 pub mod beacon;
+pub mod components;
 pub mod dave;
 pub mod human;
 pub mod time;
@@ -7,9 +8,10 @@ use beacon::Beacon;
 pub use common::Mesh;
 use common::{
     bitflags::bitflags,
-    glam::{Affine3A, Quat, Vec3},
-    Camera, GUIState, Geometry,
+    glam::{Quat, Vec3},
+    hecs, Camera, GUIState, Geometry, Material,
 };
+use components::Transform;
 use dave::Dave;
 use human::{humans, Human};
 use std::f32::consts::TAU;
@@ -19,48 +21,64 @@ pub const PLAYER_SPEED: f32 = 7.;
 pub const CAMERA_ZOOM_SPEED: f32 = 10.;
 pub const CAMERA_ROTATE_SPEED: f32 = 3.;
 
-#[derive(Clone, Debug, Default)]
 pub struct Game {
+    pub world: hecs::World,
     pub time: Time,
-    pub dave: Dave,
+    pub dave: hecs::Entity,
     pub input: Input,
     pub camera: Camera,
-    pub terrain: Vec<Mesh>,
-    pub humans: Vec<Human>,
-    pub beacons: Vec<Beacon>,
     pub gui_state: GUIState,
+}
+
+impl Default for Game {
+    fn default() -> Self {
+        Self {
+            world: Default::default(),
+            time: Default::default(),
+            dave: hecs::Entity::DANGLING,
+            input: Default::default(),
+            camera: Default::default(),
+            gui_state: Default::default(),
+        }
+    }
 }
 
 impl Game {
     pub fn new() -> Self {
         let mut camera = Camera::default();
-        let dave = Dave::default();
+        let mut world = hecs::World::new();
+        let dave = world.spawn((
+            Dave::default(),
+            Geometry::Sphere,
+            Material::from_colour([0., 0., 1.].into()),
+            Transform::from_translation([0., 2., 0.].into()),
+        ));
+        // terrain
+        world.spawn(get_grid());
         camera.position.y = 3.;
         camera.position.z = 12.;
-        camera.focus_point = dave.position;
         camera.distance = 10.;
         camera.desired_distance = camera.distance;
         camera.start_distance = camera.distance;
         Self {
             camera,
             dave,
-            terrain: get_grid(),
-            humans: vec![
-                Human::new([0., 1., 4.].into()),
-                Human::new([-3., 1., 0.].into()),
-                Human::new([0., 1., 2.].into()),
-            ],
-            beacons: vec![Beacon::new([15., 4., 0.].into())],
+            world,
             ..Default::default()
         }
     }
 
     pub fn meshes(&self) -> Vec<Mesh> {
-        let mut meshes = self.terrain.clone();
-        meshes.push(self.dave.mesh);
-        meshes.extend(self.humans.iter().map(|h| h.mesh));
-        meshes.extend(self.beacons.iter().map(|h| h.mesh));
-        meshes
+        self.world
+            .query::<(&Geometry, &Transform, &Material)>()
+            .into_iter()
+            .map(|(_, (geometry, transform, material))| Mesh {
+                geometry: *geometry,
+                texture_id: material.texture_id,
+                transform: transform.into(),
+                colour: Some(material.colour),
+            })
+            .collect()
     }
 }
 
@@ -107,24 +125,19 @@ impl Input {
     }
 }
 
-fn get_grid() -> Vec<Mesh> {
+fn get_grid() -> (Transform, Material, Geometry) {
     let plane_rotation = Quat::from_rotation_x(TAU / 4.0); // 90 degrees
-    let mut meshes = Vec::new();
-
     let grid_size = 255;
 
-    meshes.push(Mesh {
-        geometry: Geometry::Plane,
-        transform: Affine3A::from_scale_rotation_translation(
-            [grid_size as f32, grid_size as f32, 1. as f32].into(),
-            plane_rotation,
-            Default::default(),
-        ),
-        colour: Some(rgb_to_vec(11, 102, 35)),
-        ..Default::default()
-    });
-
-    meshes
+    (
+        Transform {
+            scale: [grid_size as f32, grid_size as f32, 1. as f32].into(),
+            rotation: plane_rotation,
+            ..Default::default()
+        },
+        Material::from_colour(rgb_to_vec(11, 102, 35)),
+        Geometry::Plane,
+    )
 }
 
 fn rgb_to_vec(r: usize, g: usize, b: usize) -> Vec3 {
@@ -133,7 +146,7 @@ fn rgb_to_vec(r: usize, g: usize, b: usize) -> Vec3 {
 
 pub fn dave(game: &mut Game) {
     let dt = game.time.delta();
-    game.dave.update(dt, &game.input, &game.camera.transform());
+    // game.dave.update(dt, &game.input, &game.camera.transform());
 }
 pub fn update_camera(game: &mut Game) {
     let camera = &mut game.camera;
@@ -186,7 +199,6 @@ fn set_camera_distance(input: &Input, camera: &mut Camera, dt: f32) {
 #[no_mangle]
 pub fn tick(game: &mut Game) -> Vec<Mesh> {
     while game.time.start_update() {
-        game.camera.target = game.dave.position;
         update_camera(game);
         dave(game);
         humans(game);

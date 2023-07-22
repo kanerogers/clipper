@@ -9,7 +9,7 @@ pub struct GUI {
 }
 
 #[no_mangle]
-pub fn init(
+pub fn gui_init(
     vulkan_context: &yakui_vulkan::VulkanContext,
     render_surface: yakui_vulkan::RenderSurface,
 ) -> GUI {

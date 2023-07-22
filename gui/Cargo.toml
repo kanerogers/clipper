@@ -11,4 +11,4 @@ yakui = {git = "https://github.com/leetvr/yakui", branch = "vulkan_fixes"}
 yakui-vulkan = {git = "https://github.com/leetvr/yakui", branch = "vulkan_fixes"}
 
 [lib]
-crate-type = ["dylib"]
+crate-type = ["dylib", "rlib"]
