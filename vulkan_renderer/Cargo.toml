@@ -1,7 +1,7 @@
 [package]
 authors = ["Let Eyes Equals Two"]
 edition = "2021"
-name = "renderer"
+name = "vulkan_renderer"
 version = "0.1.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -15,7 +15,7 @@ log = "0.4.17"
 raw-window-handle = "0.5.0"
 thunderdome = "0.6.0"
 vk-shader-macros = "0.2.8"
-winit = "0.28.1"
+yakui-vulkan = {git = "https://github.com/leetvr/yakui", branch = "vulkan_fixes"}
 
 [dev-dependencies]
 env_logger = "0.10.0"

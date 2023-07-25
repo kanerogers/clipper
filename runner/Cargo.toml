@@ -6,11 +6,15 @@ version = "0.1.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+common = {path = "../common"}
 env_logger = "0.10.0"
 game = {path = "../game"}
 gui = {path = "../gui"}
-# hot-lib-reloader = "^0.6"
-hot-lib-reloader = {path = "../../hot-lib-reloader-rs"}
-libloading = {path = "../../rust_libloading"}
+hot-lib-reloader = "^0.6"
 log = "0.4.19"
-renderer = {path = "../renderer"}
+
+[target.'cfg(any(target_os = "windows", target_os="linux"))'.dependencies]
+vulkan_renderer = {path = "../vulkan_renderer"}
+
+[target.'cfg(target_os = "macos")'.dependencies]
+metal_renderer = {path = "../metal_renderer"}

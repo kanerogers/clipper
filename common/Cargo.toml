@@ -10,6 +10,8 @@ bitflags = "2.3.3"
 glam = "0.22.0"
 hecs = {version = "0.10.3", default-features = false}
 rand = "0.8"
+winit = "0.28.6"
+yakui = {git = "https://github.com/leetvr/yakui", branch = "vulkan_fixes"}
 
 [lib]
-crate-type = ["dylib"]
+crate-type = ["dylib", "rlib"]

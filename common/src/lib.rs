@@ -1,8 +1,11 @@
 pub use bitflags;
 pub use glam;
-use glam::Vec3;
 pub use hecs;
 pub use rand;
+pub use winit;
+pub use yakui;
+
+use glam::Vec3;
 
 #[derive(Clone, Debug, Copy)]
 pub struct Mesh {
@@ -81,4 +84,10 @@ impl Camera {
 pub struct GUIState {
     pub paperclips: usize,
     pub workers: usize,
+}
+
+pub trait Renderer {
+    fn init(window: winit::window::Window) -> Self;
+    fn render(&mut self, meshes: &[Mesh], camera: Camera, yak: &mut yakui::Yakui);
+    fn resized(&mut self, size: winit::dpi::PhysicalSize<u32>);
 }

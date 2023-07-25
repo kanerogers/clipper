@@ -1,53 +1,57 @@
-use std::str::FromStr;
+use gui::GUI;
+#[cfg(any(target_os = "windows", target_os = "linux"))]
+use vulkan_renderer::LazyVulkan;
 
-use libloading::os::windows::{
-    LOAD_LIBRARY_SEARCH_DEFAULT_DIRS, LOAD_LIBRARY_SEARCH_USER_DIRS, LOAD_WITH_ALTERED_SEARCH_PATH,
+#[cfg(target_os = "macos")]
+use metal_renderer::MetalRenderer;
+
+use common::winit::{
+    self,
+    event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent},
+    event_loop::{ControlFlow, EventLoop},
+    platform::run_return::EventLoopExtRunReturn,
 };
-use renderer::{
-    winit::{
-        self,
-        event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent},
-        event_loop::EventLoop,
-        platform::run_return::EventLoopExtRunReturn,
-    },
-    LazyRenderer, LazyVulkan,
-};
-use winit::event_loop::ControlFlow;
+use common::Renderer;
 
 #[hot_lib_reloader::hot_module(dylib = "game", file_watch_debounce = 20, lib_dir = "target/debug")]
 mod hot_game {
     hot_functions_from_file!("game/src/lib.rs");
 
+    use common::GUIState;
     pub use game::{Game, Keys, Mesh};
 }
 
-#[hot_lib_reloader::hot_module(dylib = "gui", file_watch_debounce = 20, lib_dir = "target/debug")]
-mod hot_gui {
-    hot_functions_from_file!("gui/src/lib.rs");
-
-    pub use gui::{yakui_vulkan, GUIState, GUI};
-}
-
-pub fn init() -> (LazyVulkan, LazyRenderer, EventLoop<()>) {
+pub fn init<R: Renderer>() -> (R, EventLoop<()>, GUI) {
     env_logger::init();
+    let event_loop = winit::event_loop::EventLoop::new();
+    let size = winit::dpi::LogicalSize::new(800, 600);
 
-    // Alright, let's build some stuff
-    let (lazy_vulkan, lazy_renderer, event_loop) = LazyVulkan::builder()
-        .with_present(true)
-        .window_size([1000, 1000])
-        .build();
+    let window = winit::window::WindowBuilder::new()
+        .with_inner_size(size)
+        .with_title("Clipper".to_string())
+        .build(&event_loop)
+        .unwrap();
 
-    (lazy_vulkan, lazy_renderer, event_loop)
+    let renderer = R::init(window);
+    let gui = GUI::new(800, 600);
+
+    (renderer, event_loop, gui)
 }
+
+#[cfg(target_os = "macos")]
+type RendererImpl = MetalRenderer;
+
+#[cfg(any(target_os = "windows", target_os = "linux"))]
+type RendererImpl = LazyVulkan;
 
 fn main() {
     println!("Uh, hello?");
-    load_libs();
-    let (mut lazy_vulkan, mut renderer, mut event_loop) = init();
 
-    let (gui_vulkan_context, gui_render_surface) = get_gui_properties(&lazy_vulkan, &renderer);
+    let (mut renderer, mut event_loop, mut gui) = init::<RendererImpl>();
+
+    // let (gui_vulkan_context, gui_render_surface) = get_gui_properties(&graphics, &renderer);
     let mut game = hot_game::init();
-    let mut gui = hot_gui::gui_init(&gui_vulkan_context, gui_render_surface);
+    // let mut gui = hot_gui::gui_init(&gui_vulkan_context, gui_render_surface);
 
     // Off we go!
     let mut winit_initializing = true;
@@ -81,27 +85,7 @@ fn main() {
             }
 
             Event::MainEventsCleared => {
-                let framebuffer_index = lazy_vulkan.render_begin();
-
-                let meshes = {
-                    game.time.start_frame();
-                    hot_game::tick(&mut game)
-                };
-
-                game.input.camera_zoom = 0.;
-
-                renderer.camera = game.camera;
-                renderer.render(&lazy_vulkan.context(), framebuffer_index, &meshes);
-
-                let (gui_vulkan_context, _) = get_gui_properties(&lazy_vulkan, &renderer);
-                hot_gui::paint(
-                    &mut gui,
-                    &game.gui_state,
-                    &gui_vulkan_context,
-                    framebuffer_index,
-                );
-                lazy_vulkan
-                    .render_end(framebuffer_index, &[lazy_vulkan.present_complete_semaphore]);
+                window_tick(&mut game, &mut renderer, &mut gui);
             }
             Event::WindowEvent {
                 event: WindowEvent::Resized(size),
@@ -110,11 +94,8 @@ fn main() {
                 if winit_initializing {
                     return;
                 } else {
-                    let new_render_surface = lazy_vulkan.resized(size.width, size.height);
-                    renderer.update_surface(new_render_surface, &lazy_vulkan.context().device);
-                    let (gui_vulkan_context, gui_render_surface) =
-                        get_gui_properties(&lazy_vulkan, &renderer);
-                    hot_gui::resized(&mut gui, gui_render_surface, &gui_vulkan_context);
+                    gui.resized(size.width, size.height);
+                    renderer.resized(size);
                 }
             }
 
@@ -123,62 +104,31 @@ fn main() {
     });
 
     // I guess we better do this or else the Dreaded Validation Layers will complain
-    unsafe {
-        renderer.cleanup(&lazy_vulkan.context().device);
-    }
+    // unsafe {
+    //     renderer.cleanup(&graphics.context().device);
+    // }
 }
 
-fn load_libs() {
-    use libloading::os::windows::Library;
-    unsafe {
-        let mut path = std::path::PathBuf::from_str("target/debug").unwrap();
-        path = path.canonicalize().unwrap();
-        println!("Adding {path:?} to search path");
-        Library::add_directory_to_search_path(path).unwrap();
-
-        println!("..done. Loading library..");
-        let absolute_dll_path = std::path::PathBuf::from_str("target/debug/game.dll")
-            .unwrap()
-            .canonicalize()
-            .unwrap();
-        Library::load_with_flags(absolute_dll_path, 0).unwrap();
-        println!("Success!");
-    }
-}
-
-fn get_gui_properties<'a>(
-    lazy_vulkan: &'a LazyVulkan,
-    renderer: &LazyRenderer,
-) -> (
-    hot_gui::yakui_vulkan::VulkanContext<'a>,
-    hot_gui::yakui_vulkan::RenderSurface,
-) {
-    let vulkan_context = lazy_vulkan.context();
-    let gui_vulkan_context = hot_gui::yakui_vulkan::VulkanContext::new(
-        &vulkan_context.device,
-        vulkan_context.queue,
-        vulkan_context.draw_command_buffer,
-        vulkan_context.command_pool,
-        vulkan_context.memory_properties,
-    );
-
-    let render_surface = &renderer.render_surface;
-    let gui_render_surface = hot_gui::yakui_vulkan::RenderSurface {
-        resolution: render_surface.resolution,
-        format: render_surface.format,
-        image_views: render_surface.image_views.clone(),
-        load_op: hot_gui::yakui_vulkan::vk::AttachmentLoadOp::LOAD,
+fn window_tick<R: Renderer>(game: &mut hot_game::Game, renderer: &mut R, gui: &mut GUI) {
+    let meshes = {
+        game.time.start_frame();
+        hot_game::tick(game, &mut gui.state)
     };
 
-    (gui_vulkan_context, gui_render_surface)
+    game.input.camera_zoom = 0.;
+
+    gui.update();
+    renderer.render(&meshes, game.camera, &mut gui.yak);
 }
 
 fn handle_mousewheel(game: &mut hot_game::Game, delta: winit::event::MouseScrollDelta) {
     let scroll_amount = match delta {
         winit::event::MouseScrollDelta::LineDelta(_, scroll_y) => -scroll_y,
-        _ => todo!(),
+        winit::event::MouseScrollDelta::PixelDelta(position) => position.y.clamp(-1., 1.) as _,
     };
+    log::debug!("Scroll amount: {scroll_amount}");
     game.input.camera_zoom += scroll_amount;
+    log::debug!("Zoom amount: {}", game.input.camera_zoom);
 }
 
 fn handle_keypress(game: &mut hot_game::Game, keyboard_input: winit::event::KeyboardInput) -> () {

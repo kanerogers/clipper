@@ -27,7 +27,6 @@ pub struct Game {
     pub dave: hecs::Entity,
     pub input: Input,
     pub camera: Camera,
-    pub gui_state: GUIState,
 }
 
 impl Default for Game {
@@ -38,7 +37,6 @@ impl Default for Game {
             dave: hecs::Entity::DANGLING,
             input: Default::default(),
             camera: Default::default(),
-            gui_state: Default::default(),
         }
     }
 }
@@ -197,7 +195,7 @@ fn set_camera_distance(input: &Input, camera: &mut Camera, dt: f32) {
 }
 
 #[no_mangle]
-pub fn tick(game: &mut Game) -> Vec<Mesh> {
+pub fn tick(game: &mut Game, gui_state: &mut GUIState) -> Vec<Mesh> {
     while game.time.start_update() {
         update_camera(game);
         dave(game);
