@@ -5,10 +5,7 @@ pub mod vulkan_context;
 pub mod vulkan_texture;
 
 use ash::vk;
-use common::glam;
-use common::winit;
-use common::Camera;
-use common::Renderer;
+use common::{glam, winit, yakui, Camera, Renderer};
 use glam::{Vec2, Vec4};
 pub use lazy_renderer::LazyRenderer;
 
@@ -57,6 +54,7 @@ pub fn find_memorytype_index(
 
 pub struct LazyVulkan {
     context: VulkanContext,
+    yakui_vulkan: yakui_vulkan::YakuiVulkan,
     pub renderer: LazyRenderer,
     pub window: winit::window::Window,
     pub surface: Surface,
@@ -85,16 +83,30 @@ impl Renderer for LazyVulkan {
         Self::new(window)
     }
 
-    fn render(&mut self, meshes: &[common::Mesh], camera: Camera) {
+    fn render(&mut self, meshes: &[common::Mesh], camera: Camera, yak: &mut yakui::Yakui) {
         let swapchain_index = self.render_begin();
         self.renderer.camera = camera;
-        self.renderer
-            .render(self.context(), swapchain_index, meshes);
+        let context = self.context();
+        self.renderer.render(context, swapchain_index, meshes);
+
+        // blergh
+        let yakui_vulkan_context = &yakui_vulkan::VulkanContext::new(
+            &self.context.device,
+            context.queue,
+            context.draw_command_buffer,
+            context.command_pool,
+            context.memory_properties,
+        );
+
+        self.yakui_vulkan
+            .paint(yak, &yakui_vulkan_context, swapchain_index);
         self.render_end(swapchain_index, &[self.present_complete_semaphore]);
     }
 
     fn resized(&mut self, size: winit::dpi::PhysicalSize<u32>) {
         let new_render_surface = self.resized(size.width, size.height);
+        self.yakui_vulkan
+            .update_surface((&new_render_surface).into(), &self.context.device);
         self.renderer
             .update_surface(new_render_surface, &self.context.device);
     }
@@ -153,10 +165,13 @@ impl LazyVulkan {
             swapchain_image_views,
         );
 
+        let yakui_vulkan =
+            yakui_vulkan::YakuiVulkan::new(&(&context).into(), (&render_surface).into());
         let renderer = LazyRenderer::new(&context, render_surface);
 
         Self {
             window,
+            yakui_vulkan,
             context,
             surface,
             swapchain_loader,

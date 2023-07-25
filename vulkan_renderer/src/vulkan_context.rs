@@ -523,3 +523,15 @@ pub fn init(extension_names: &mut Vec<*const std::ffi::c_char>) -> (ash::Entry, 
 
     (entry, instance)
 }
+
+impl<'a> From<&'a VulkanContext> for yakui_vulkan::VulkanContext<'a> {
+    fn from(context: &'a VulkanContext) -> Self {
+        yakui_vulkan::VulkanContext::new(
+            &context.device,
+            context.queue,
+            context.draw_command_buffer,
+            context.command_pool,
+            context.memory_properties,
+        )
+    }
+}

@@ -87,6 +87,17 @@ impl RenderSurface {
     }
 }
 
+impl From<&RenderSurface> for yakui_vulkan::RenderSurface {
+    fn from(surface: &RenderSurface) -> Self {
+        yakui_vulkan::RenderSurface {
+            resolution: surface.resolution,
+            format: surface.format,
+            image_views: surface.image_views.clone(),
+            load_op: vk::AttachmentLoadOp::DONT_CARE,
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct DepthBuffer {
     pub image: vk::Image,

@@ -88,6 +88,6 @@ pub struct GUIState {
 
 pub trait Renderer {
     fn init(window: winit::window::Window) -> Self;
-    fn render(&mut self, meshes: &[Mesh], camera: Camera);
+    fn render(&mut self, meshes: &[Mesh], camera: Camera, yak: &mut yakui::Yakui);
     fn resized(&mut self, size: winit::dpi::PhysicalSize<u32>);
 }

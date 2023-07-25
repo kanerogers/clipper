@@ -7,4 +7,3 @@ version = "0.1.0"
 
 [dependencies]
 common = {path = "../common"}
-yakui-vulkan = {git = "https://github.com/leetvr/yakui", branch = "vulkan_fixes"}

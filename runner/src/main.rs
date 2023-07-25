@@ -1,32 +1,30 @@
+use gui::GUI;
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 use vulkan_renderer::LazyVulkan;
 
 #[cfg(target_os = "macos")]
 use metal_renderer::MetalRenderer;
 
-use common::winit::{
-    self,
-    event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent},
-    event_loop::{ControlFlow, EventLoop},
-    platform::run_return::EventLoopExtRunReturn,
-};
 use common::Renderer;
+use common::{
+    winit::{
+        self,
+        event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent},
+        event_loop::{ControlFlow, EventLoop},
+        platform::run_return::EventLoopExtRunReturn,
+    },
+    GUIState,
+};
 
 #[hot_lib_reloader::hot_module(dylib = "game", file_watch_debounce = 20, lib_dir = "target/debug")]
 mod hot_game {
     hot_functions_from_file!("game/src/lib.rs");
 
+    use common::GUIState;
     pub use game::{Game, Keys, Mesh};
 }
 
-#[hot_lib_reloader::hot_module(dylib = "gui", file_watch_debounce = 20, lib_dir = "target/debug")]
-mod hot_gui {
-    hot_functions_from_file!("gui/src/lib.rs");
-
-    pub use gui::{yakui_vulkan, GUIState, GUI};
-}
-
-pub fn init<R: Renderer>() -> (R, EventLoop<()>) {
+pub fn init<R: Renderer>() -> (R, EventLoop<()>, GUI) {
     env_logger::init();
     let event_loop = winit::event_loop::EventLoop::new();
     let size = winit::dpi::LogicalSize::new(800, 600);
@@ -38,8 +36,9 @@ pub fn init<R: Renderer>() -> (R, EventLoop<()>) {
         .unwrap();
 
     let renderer = R::init(window);
+    let gui = GUI::new(800, 600);
 
-    (renderer, event_loop)
+    (renderer, event_loop, gui)
 }
 
 #[cfg(target_os = "macos")]
@@ -51,7 +50,7 @@ type RendererImpl = LazyVulkan;
 fn main() {
     println!("Uh, hello?");
 
-    let (mut renderer, mut event_loop) = init::<RendererImpl>();
+    let (mut renderer, mut event_loop, mut gui) = init::<RendererImpl>();
 
     // let (gui_vulkan_context, gui_render_surface) = get_gui_properties(&graphics, &renderer);
     let mut game = hot_game::init();
@@ -89,7 +88,7 @@ fn main() {
             }
 
             Event::MainEventsCleared => {
-                window_tick(&mut game, &mut renderer);
+                window_tick(&mut game, &mut renderer, &mut gui);
             }
             Event::WindowEvent {
                 event: WindowEvent::Resized(size),
@@ -99,9 +98,6 @@ fn main() {
                     return;
                 } else {
                     renderer.resized(size);
-                    // let (gui_vulkan_context, gui_render_surface) =
-                    //     get_gui_properties(&lazy_vulkan, &renderer);
-                    // hot_gui::resized(&mut gui, gui_render_surface, &gui_vulkan_context);
                 }
             }
 
@@ -116,13 +112,13 @@ fn main() {
     }
 }
 
-fn window_tick<R: Renderer>(game: &mut hot_game::Game, renderer: &mut R) {
+fn window_tick<R: Renderer>(game: &mut hot_game::Game, renderer: &mut R, gui: &mut GUI) {
     game.input.camera_zoom = 0.;
     let meshes = {
         game.time.start_frame();
-        hot_game::tick(game)
+        hot_game::tick(game, &mut gui.state)
     };
-    renderer.render(&meshes, game.camera);
+    renderer.render(&meshes, game.camera, &mut gui.yak);
 }
 
 #[cfg(any(target_os = "windows", target_os = "linux"))]

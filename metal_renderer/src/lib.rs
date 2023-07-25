@@ -1,7 +1,7 @@
 mod metal_context;
 use common::{
     glam::{self, Mat3A, Mat4, Vec2, Vec3, Vec4},
-    winit, Camera, Geometry, Mesh, Renderer,
+    winit, yakui, Camera, Geometry, Mesh, Renderer,
 };
 use metal_context::MetalContext;
 
@@ -11,7 +11,7 @@ impl Renderer for MetalRenderer {
         MetalRenderer::new(metal_context)
     }
 
-    fn render(&mut self, meshes: &[Mesh], camera: Camera) {
+    fn render(&mut self, meshes: &[Mesh], camera: Camera, yak: &mut yakui::Yakui) {
         self.camera = camera;
         self._render(meshes);
     }
