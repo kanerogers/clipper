@@ -412,7 +412,7 @@ impl LazyRenderer {
     }
 
     /// Render the meshes we've been given
-    pub fn render(&self, vulkan_context: &VulkanContext, framebuffer_index: u32, meshes: &[Mesh]) {
+    pub fn _render(&self, vulkan_context: &VulkanContext, framebuffer_index: u32, meshes: &[Mesh]) {
         let device = &vulkan_context.device;
         let command_buffer = vulkan_context.draw_command_buffer;
 

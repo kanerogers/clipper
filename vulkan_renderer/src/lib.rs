@@ -87,7 +87,7 @@ impl Renderer for LazyVulkan {
         let swapchain_index = self.render_begin();
         self.renderer.camera = camera;
         let context = self.context();
-        self.renderer.render(context, swapchain_index, meshes);
+        self.renderer._render(context, swapchain_index, meshes);
 
         // blergh
         let yakui_vulkan_context = &yakui_vulkan::VulkanContext::new(
@@ -104,7 +104,7 @@ impl Renderer for LazyVulkan {
     }
 
     fn resized(&mut self, size: winit::dpi::PhysicalSize<u32>) {
-        let new_render_surface = self.resized(size.width, size.height);
+        let new_render_surface = self._resized(size.width, size.height);
         self.yakui_vulkan
             .update_surface((&new_render_surface).into(), &self.context.device);
         self.renderer
@@ -185,7 +185,7 @@ impl LazyVulkan {
         }
     }
 
-    pub fn resized(&mut self, window_width: u32, window_height: u32) -> RenderSurface {
+    pub fn _resized(&mut self, window_width: u32, window_height: u32) -> RenderSurface {
         unsafe {
             let device = &self.context.device;
             device.device_wait_idle().unwrap();
