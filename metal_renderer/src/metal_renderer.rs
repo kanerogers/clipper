@@ -1,8 +1,9 @@
+use crate::{metal_context::MetalContext, yakui_metal::YakuiMetal};
 use common::{
-    glam::{self, Mat3A, Mat4, Vec2, Vec3, Vec4},
+    glam::{self, Mat4, Vec2, Vec3, Vec4},
     winit, yakui, Camera, Geometry, Mesh, Renderer,
 };
-use metal_context::MetalContext;
+use metal::CommandBufferRef;
 
 impl Renderer for MetalRenderer {
     fn init(window: winit::window::Window) -> Self {
@@ -12,7 +13,20 @@ impl Renderer for MetalRenderer {
 
     fn render(&mut self, meshes: &[Mesh], camera: Camera, yak: &mut yakui::Yakui) {
         self.camera = camera;
-        self._render(meshes);
+        let context = &self.context;
+        let drawable = match context.layer.next_drawable() {
+            Some(drawable) => drawable,
+            None => return,
+        };
+
+        let command_buffer = context.command_queue.new_command_buffer();
+        self._render(meshes, drawable, command_buffer);
+
+        self.yakui_metal
+            .paint(context, yak, drawable, command_buffer);
+
+        command_buffer.present_drawable(drawable);
+        command_buffer.commit();
     }
 
     fn resized(&mut self, size: winit::dpi::PhysicalSize<u32>) {
@@ -28,6 +42,7 @@ pub struct MetalRenderer {
     uniform_buffer: metal::Buffer,
     depth_stencil_state: metal::DepthStencilState,
     context: MetalContext,
+    yakui_metal: YakuiMetal,
     pub camera: Camera,
 }
 
@@ -74,6 +89,7 @@ impl MetalRenderer {
         Self {
             vertex_buffer,
             index_buffer,
+            yakui_metal: YakuiMetal::new(&context),
             pipeline_state: triangle_pipeline_state,
             geometry_offsets,
             uniform_buffer,
@@ -83,13 +99,13 @@ impl MetalRenderer {
         }
     }
 
-    fn _render(&mut self, meshes: &[Mesh]) {
+    fn _render(
+        &self,
+        meshes: &[Mesh],
+        drawable: &metal::MetalDrawableRef,
+        command_buffer: &metal::CommandBufferRef,
+    ) {
         let context = &self.context;
-        let drawable = match context.layer.next_drawable() {
-            Some(drawable) => drawable,
-            None => return,
-        };
-
         let render_pass_descriptor = metal::RenderPassDescriptor::new();
 
         prepare_render_pass_descriptor(
@@ -98,7 +114,6 @@ impl MetalRenderer {
             &context.depth_texture,
         );
 
-        let command_buffer = context.command_queue.new_command_buffer();
         let encoder = command_buffer.new_render_command_encoder(&render_pass_descriptor);
 
         encoder.set_render_pipeline_state(&self.pipeline_state);
@@ -136,9 +151,6 @@ impl MetalRenderer {
         }
 
         encoder.end_encoding();
-
-        command_buffer.present_drawable(&drawable);
-        command_buffer.commit();
     }
 }
 

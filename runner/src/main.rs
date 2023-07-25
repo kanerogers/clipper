@@ -94,7 +94,8 @@ fn main() {
                 if winit_initializing {
                     return;
                 } else {
-                    renderer.resized(size.width, size.height);
+                    gui.resized(size.width, size.height);
+                    renderer.resized(size);
                 }
             }
 
@@ -109,11 +110,12 @@ fn main() {
 }
 
 fn window_tick<R: Renderer>(game: &mut hot_game::Game, renderer: &mut R, gui: &mut GUI) {
-    game.input.camera_zoom = 0.;
     let meshes = {
         game.time.start_frame();
         hot_game::tick(game, &mut gui.state)
     };
+
+    game.input.camera_zoom = 0.;
 
     gui.update();
     renderer.render(&meshes, game.camera, &mut gui.yak);
