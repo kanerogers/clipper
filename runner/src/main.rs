@@ -5,16 +5,13 @@ use vulkan_renderer::LazyVulkan;
 #[cfg(target_os = "macos")]
 use metal_renderer::MetalRenderer;
 
-use common::Renderer;
-use common::{
-    winit::{
-        self,
-        event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent},
-        event_loop::{ControlFlow, EventLoop},
-        platform::run_return::EventLoopExtRunReturn,
-    },
-    GUIState,
+use common::winit::{
+    self,
+    event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent},
+    event_loop::{ControlFlow, EventLoop},
+    platform::run_return::EventLoopExtRunReturn,
 };
+use common::Renderer;
 
 #[hot_lib_reloader::hot_module(dylib = "game", file_watch_debounce = 20, lib_dir = "target/debug")]
 mod hot_game {
@@ -97,7 +94,7 @@ fn main() {
                 if winit_initializing {
                     return;
                 } else {
-                    renderer.resized(size);
+                    renderer.resized(size.width, size.height);
                 }
             }
 
@@ -106,10 +103,9 @@ fn main() {
     });
 
     // I guess we better do this or else the Dreaded Validation Layers will complain
-    #[cfg(any(target_os = "windows", target_os = "linux"))]
-    unsafe {
-        renderer.cleanup(&graphics.context().device);
-    }
+    // unsafe {
+    //     renderer.cleanup(&graphics.context().device);
+    // }
 }
 
 fn window_tick<R: Renderer>(game: &mut hot_game::Game, renderer: &mut R, gui: &mut GUI) {
@@ -118,60 +114,9 @@ fn window_tick<R: Renderer>(game: &mut hot_game::Game, renderer: &mut R, gui: &m
         game.time.start_frame();
         hot_game::tick(game, &mut gui.state)
     };
+
+    gui.update();
     renderer.render(&meshes, game.camera, &mut gui.yak);
-}
-
-#[cfg(any(target_os = "windows", target_os = "linux"))]
-fn window_tick(graphics: &MetalContext, mut game: _, renderer: &mut MetalRenderer) {
-    let framebuffer_index = graphics.render_begin();
-
-    let meshes = {
-        game.time.start_frame();
-        hot_game::tick(&mut game)
-    };
-
-    game.input.camera_zoom = 0.;
-
-    renderer.camera = game.camera;
-    renderer.render(&graphics.context(), framebuffer_index, &meshes);
-
-    let (gui_vulkan_context, _) = get_gui_properties(&lazy_vulkan, &*renderer);
-    hot_gui::paint(
-        &mut gui,
-        &game.gui_state,
-        &gui_vulkan_context,
-        framebuffer_index,
-    );
-    graphics.render_end(framebuffer_index, &[graphics.present_complete_semaphore]);
-}
-
-#[cfg(target_os = "windows")]
-#[cfg(all(target_os = "windows", target_os = "linux"))]
-fn get_gui_properties<'a>(
-    lazy_vulkan: &'a LazyVulkan,
-    renderer: &LazyRenderer,
-) -> (
-    hot_gui::yakui_vulkan::VulkanContext<'a>,
-    hot_gui::yakui_vulkan::RenderSurface,
-) {
-    let vulkan_context = lazy_vulkan.context();
-    let gui_vulkan_context = hot_gui::yakui_vulkan::VulkanContext::new(
-        &vulkan_context.device,
-        vulkan_context.queue,
-        vulkan_context.draw_command_buffer,
-        vulkan_context.command_pool,
-        vulkan_context.memory_properties,
-    );
-
-    let render_surface = &renderer.render_surface;
-    let gui_render_surface = hot_gui::yakui_vulkan::RenderSurface {
-        resolution: render_surface.resolution,
-        format: render_surface.format,
-        image_views: render_surface.image_views.clone(),
-        load_op: hot_gui::yakui_vulkan::vk::AttachmentLoadOp::LOAD,
-    };
-
-    (gui_vulkan_context, gui_render_surface)
 }
 
 fn handle_mousewheel(game: &mut hot_game::Game, delta: winit::event::MouseScrollDelta) {
