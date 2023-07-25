@@ -3,7 +3,7 @@ use crate::{
     descriptors::Descriptors,
     vulkan_context::VulkanContext,
     vulkan_texture::{VulkanTexture, VulkanTextureCreateInfo},
-    LazyVulkanBuilder, Vertex,
+    Vertex,
 };
 use common::{glam, Camera, Geometry, Mesh};
 use glam::{Vec2, Vec4};
@@ -129,18 +129,10 @@ impl LazyRenderer {
     /// ## Safety
     /// - `vulkan_context` must have valid members
     /// - the members of `render_surface` must have been created with the same [`ash::Device`] as `vulkan_context`.
-    pub fn new(
-        vulkan_context: &VulkanContext,
-        render_surface: RenderSurface,
-        builder: &LazyVulkanBuilder,
-    ) -> Self {
+    pub fn new(vulkan_context: &VulkanContext, render_surface: RenderSurface) -> Self {
         let device = &vulkan_context.device;
         let descriptors = Descriptors::new(vulkan_context);
-        let final_layout = if builder.with_present {
-            vk::ImageLayout::PRESENT_SRC_KHR
-        } else {
-            vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL
-        };
+        let final_layout = vk::ImageLayout::PRESENT_SRC_KHR;
 
         let renderpass_attachments = [
             vk::AttachmentDescription {
@@ -283,9 +275,16 @@ impl LazyRenderer {
                 format: vk::Format::R32G32B32A32_SFLOAT,
                 offset: bytemuck::offset_of!(Vertex, position) as _,
             },
-            // UV / texcoords
+            // normals
             vk::VertexInputAttributeDescription {
                 location: 1,
+                binding: 0,
+                format: vk::Format::R32G32B32A32_SFLOAT,
+                offset: bytemuck::offset_of!(Vertex, normal) as _,
+            },
+            // UV
+            vk::VertexInputAttributeDescription {
+                location: 2,
                 binding: 0,
                 format: vk::Format::R32G32_SFLOAT,
                 offset: bytemuck::offset_of!(Vertex, uv) as _,

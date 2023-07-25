@@ -1,3 +1,4 @@
+use common::yakui;
 pub use common::GUIState;
 pub use yakui::geometry::Rect;
 use yakui::MainAxisSize;

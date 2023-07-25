@@ -6,13 +6,14 @@ pub mod vulkan_texture;
 
 use ash::vk;
 use common::glam;
+use common::winit;
+use common::Camera;
+use common::Renderer;
 use glam::{Vec2, Vec4};
 pub use lazy_renderer::LazyRenderer;
-use winit::{event_loop::EventLoop, window::Window};
 
 pub use crate::vulkan_texture::NO_TEXTURE_ID;
 use crate::{lazy_renderer::RenderSurface, vulkan_context::VulkanContext};
-pub use winit;
 
 #[derive(Default, Debug, Clone, Copy)]
 pub struct Vertex {
@@ -54,42 +55,9 @@ pub fn find_memorytype_index(
         .map(|(index, _memory_type)| index as _)
 }
 
-#[derive(Default, Debug, Clone)]
-pub struct LazyVulkanBuilder {
-    pub with_present: bool,
-    pub window_size: Option<vk::Extent2D>,
-}
-
-impl LazyVulkanBuilder {
-    pub fn with_present(mut self, present: bool) -> Self {
-        self.with_present = present;
-        self
-    }
-
-    pub fn window_size(mut self, extent: [u32; 2]) -> Self {
-        self.window_size = Some(vk::Extent2D {
-            width: extent[0],
-            height: extent[1],
-        });
-        self
-    }
-
-    pub fn build(self) -> (LazyVulkan, LazyRenderer, EventLoop<()>) {
-        let window_resolution = self.window_size.unwrap_or(vk::Extent2D {
-            width: 500,
-            height: 500,
-        });
-        let (event_loop, window) = init_winit(window_resolution.width, window_resolution.height);
-
-        let (vulkan, render_surface) = LazyVulkan::new(window, window_resolution);
-        let renderer = LazyRenderer::new(vulkan.context(), render_surface, &self);
-
-        (vulkan, renderer, event_loop)
-    }
-}
-
 pub struct LazyVulkan {
     context: VulkanContext,
+    pub renderer: LazyRenderer,
     pub window: winit::window::Window,
     pub surface: Surface,
     pub swapchain: vk::SwapchainKHR,
@@ -112,18 +80,38 @@ pub struct Surface {
     pub desired_image_count: u32,
 }
 
-impl LazyVulkan {
-    pub fn builder() -> LazyVulkanBuilder {
-        Default::default()
+impl Renderer for LazyVulkan {
+    fn init(window: winit::window::Window) -> Self {
+        Self::new(window)
     }
 
+    fn render(&mut self, meshes: &[common::Mesh], camera: Camera) {
+        let swapchain_index = self.render_begin();
+        self.renderer.camera = camera;
+        self.renderer
+            .render(self.context(), swapchain_index, meshes);
+        self.render_end(swapchain_index, &[self.present_complete_semaphore]);
+    }
+
+    fn resized(&mut self, size: winit::dpi::PhysicalSize<u32>) {
+        let new_render_surface = self.resized(size.width, size.height);
+        self.renderer
+            .update_surface(new_render_surface, &self.context.device);
+    }
+}
+
+impl LazyVulkan {
     pub fn context(&self) -> &VulkanContext {
         &self.context
     }
 
     /// Bring up all the Vulkan pomp and ceremony required to render things.
     /// Vulkan Broadly lifted from: https://github.com/ash-rs/ash/blob/0.37.2/examples/src/lib.rs
-    fn new(window: Window, window_resolution: vk::Extent2D) -> (Self, RenderSurface) {
+    fn new(window: winit::window::Window) -> Self {
+        let window_resolution = vk::Extent2D {
+            width: window.inner_size().width as _,
+            height: window.inner_size().height as _,
+        };
         let (context, surface) = VulkanContext::new_with_surface(&window, window_resolution);
         let device = &context.device;
         let instance = &context.instance;
@@ -165,25 +153,24 @@ impl LazyVulkan {
             swapchain_image_views,
         );
 
-        (
-            Self {
-                window,
-                context,
-                surface,
-                swapchain_loader,
-                swapchain,
-                swapchain_images,
-                present_complete_semaphore,
-                rendering_complete_semaphore,
-                draw_commands_reuse_fence,
-                setup_commands_reuse_fence,
-            },
-            render_surface,
-        )
+        let renderer = LazyRenderer::new(&context, render_surface);
+
+        Self {
+            window,
+            context,
+            surface,
+            swapchain_loader,
+            swapchain,
+            swapchain_images,
+            present_complete_semaphore,
+            rendering_complete_semaphore,
+            draw_commands_reuse_fence,
+            setup_commands_reuse_fence,
+            renderer,
+        }
     }
 
     pub fn resized(&mut self, window_width: u32, window_height: u32) -> RenderSurface {
-        println!("Vulkan Resized: {window_width}, {window_height}");
         unsafe {
             let device = &self.context.device;
             device.device_wait_idle().unwrap();
@@ -292,25 +279,6 @@ impl LazyVulkan {
             }
         };
     }
-}
-
-pub(crate) fn init_winit(
-    window_width: u32,
-    window_height: u32,
-) -> (winit::event_loop::EventLoop<()>, winit::window::Window) {
-    use winit::{event_loop::EventLoopBuilder, window::WindowBuilder};
-
-    let event_loop = EventLoopBuilder::new().build();
-
-    let window = WindowBuilder::new()
-        .with_title("Lazy Vulkan")
-        .with_inner_size(winit::dpi::LogicalSize::new(
-            f64::from(window_width),
-            f64::from(window_height),
-        ))
-        .build(&event_loop)
-        .unwrap();
-    (event_loop, window)
 }
 
 fn create_swapchain(
