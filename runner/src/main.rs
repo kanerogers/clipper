@@ -5,19 +5,22 @@ use vulkan_renderer::LazyVulkan;
 #[cfg(target_os = "macos")]
 use metal_renderer::MetalRenderer;
 
-use common::winit::{
-    self,
-    event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent},
-    event_loop::{ControlFlow, EventLoop},
-    platform::run_return::EventLoopExtRunReturn,
+use common::{
+    log,
+    winit::{
+        self,
+        event::{Event, WindowEvent},
+        event_loop::{ControlFlow, EventLoop},
+        platform::run_return::EventLoopExtRunReturn,
+    },
+    Renderer,
 };
-use common::Renderer;
 
 #[hot_lib_reloader::hot_module(dylib = "game", file_watch_debounce = 20, lib_dir = "target/debug")]
 mod hot_game {
     hot_functions_from_file!("game/src/lib.rs");
 
-    use common::GUIState;
+    use common::{winit, GUIState};
     pub use game::{Game, Keys, Mesh};
 }
 
@@ -61,18 +64,6 @@ fn main() {
             } => {
                 *control_flow = ControlFlow::Exit;
             }
-            Event::WindowEvent {
-                event: WindowEvent::KeyboardInput { input, .. },
-                ..
-            } => {
-                handle_keypress(&mut game, input);
-            }
-            Event::WindowEvent {
-                event: WindowEvent::MouseWheel { delta, .. },
-                ..
-            } => {
-                handle_mousewheel(&mut game, delta);
-            }
             Event::NewEvents(cause) => {
                 if cause == winit::event::StartCause::Init {
                     winit_initializing = true;
@@ -95,7 +86,7 @@ fn main() {
                     renderer.resized(size);
                 }
             }
-
+            Event::WindowEvent { event, .. } => hot_game::handle_winit_event(&mut game, event),
             _ => (),
         }
     });
@@ -113,77 +104,4 @@ fn window_tick<R: Renderer>(game: &mut hot_game::Game, renderer: &mut R, gui: &m
 
     gui.update();
     renderer.render(&meshes, game.camera, &mut gui.yak);
-}
-
-fn handle_mousewheel(game: &mut hot_game::Game, delta: winit::event::MouseScrollDelta) {
-    let scroll_amount = match delta {
-        winit::event::MouseScrollDelta::LineDelta(_, scroll_y) => -scroll_y,
-        winit::event::MouseScrollDelta::PixelDelta(position) => position.y.clamp(-1., 1.) as _,
-    };
-    log::debug!("Scroll amount: {scroll_amount}");
-    game.input.camera_zoom += scroll_amount;
-    log::debug!("Zoom amount: {}", game.input.camera_zoom);
-}
-
-fn handle_keypress(game: &mut hot_game::Game, keyboard_input: winit::event::KeyboardInput) -> () {
-    use hot_game::Keys;
-    let game_input = &mut game.input;
-    let KeyboardInput {
-        virtual_keycode,
-        state,
-        ..
-    } = keyboard_input;
-    match (state, virtual_keycode) {
-        (ElementState::Pressed, Some(VirtualKeyCode::A)) => {
-            game_input.keyboard_state.insert(Keys::A)
-        }
-        (ElementState::Released, Some(VirtualKeyCode::A)) => {
-            game_input.keyboard_state.remove(Keys::A)
-        }
-        (ElementState::Pressed, Some(VirtualKeyCode::D)) => {
-            game_input.keyboard_state.insert(Keys::D)
-        }
-        (ElementState::Released, Some(VirtualKeyCode::D)) => {
-            game_input.keyboard_state.remove(Keys::D)
-        }
-        (ElementState::Pressed, Some(VirtualKeyCode::W)) => {
-            game_input.keyboard_state.insert(Keys::W)
-        }
-        (ElementState::Released, Some(VirtualKeyCode::W)) => {
-            game_input.keyboard_state.remove(Keys::W)
-        }
-        (ElementState::Pressed, Some(VirtualKeyCode::S)) => {
-            game_input.keyboard_state.insert(Keys::S)
-        }
-        (ElementState::Released, Some(VirtualKeyCode::S)) => {
-            game_input.keyboard_state.remove(Keys::S)
-        }
-        (ElementState::Pressed, Some(VirtualKeyCode::Space)) => {
-            game_input.keyboard_state.insert(Keys::Space)
-        }
-        (ElementState::Released, Some(VirtualKeyCode::Space)) => {
-            game_input.keyboard_state.remove(Keys::Space)
-        }
-        (ElementState::Pressed, Some(VirtualKeyCode::C)) => {
-            game_input.keyboard_state.insert(Keys::C)
-        }
-        (ElementState::Released, Some(VirtualKeyCode::C)) => {
-            game_input.keyboard_state.remove(Keys::C)
-        }
-        (ElementState::Pressed, Some(VirtualKeyCode::Q)) => {
-            game_input.keyboard_state.insert(Keys::Q)
-        }
-        (ElementState::Released, Some(VirtualKeyCode::Q)) => {
-            game_input.keyboard_state.remove(Keys::Q)
-        }
-        (ElementState::Pressed, Some(VirtualKeyCode::E)) => {
-            game_input.keyboard_state.insert(Keys::E)
-        }
-        (ElementState::Released, Some(VirtualKeyCode::E)) => {
-            game_input.keyboard_state.remove(Keys::E)
-        }
-
-        (ElementState::Pressed, Some(VirtualKeyCode::Escape)) => *game = hot_game::init(),
-        _ => {}
-    }
 }

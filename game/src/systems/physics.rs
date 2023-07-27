@@ -1,4 +1,4 @@
-use common::rapier3d::{self, na, prelude::*};
+use common::rapier3d::prelude::*;
 use common::{hecs, Geometry};
 
 use crate::components::Transform;

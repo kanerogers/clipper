@@ -1,6 +1,7 @@
 pub use bitflags;
 pub use glam;
 pub use hecs;
+pub use log;
 pub use rand;
 pub use rapier3d;
 pub use winit;

@@ -1,17 +1,20 @@
 pub mod beacon;
 pub mod components;
+mod input;
 mod systems;
 pub mod time;
 
 pub use common::Mesh;
 use common::{
     bitflags::bitflags,
-    glam::{Quat, Vec3},
-    hecs, rand, Camera, GUIState, Geometry, Material,
+    glam::{Quat, Vec2, Vec3},
+    hecs, rand,
+    winit::{self},
+    Camera, GUIState, Geometry, Material,
 };
 use components::{Dave, Human, HumanState, Transform, Velocity};
 use std::f32::consts::TAU;
-use systems::{beacons, dave_controller, humans, physics, PhysicsContext};
+use systems::{beacons, click_system, dave_controller, humans, physics, PhysicsContext};
 use time::Time;
 
 use crate::beacon::Beacon;
@@ -30,6 +33,7 @@ pub fn init() -> Game {
 pub fn tick(game: &mut Game, gui_state: &mut GUIState) -> Vec<Mesh> {
     while game.time.start_update() {
         update_camera(game);
+        click_system(game);
         dave_controller(game);
         humans(game);
         physics(game);
@@ -38,6 +42,11 @@ pub fn tick(game: &mut Game, gui_state: &mut GUIState) -> Vec<Mesh> {
     }
 
     game.meshes()
+}
+
+#[no_mangle]
+pub fn handle_winit_event(game: &mut Game, event: winit::event::WindowEvent) {
+    input::handle_winit_event(game, event);
 }
 
 pub struct Game {
@@ -158,6 +167,7 @@ impl Keys {
 pub struct Input {
     pub keyboard_state: Keys,
     pub camera_zoom: f32,
+    pub click_position: Option<Vec2>,
 }
 
 impl Default for Input {
@@ -165,6 +175,7 @@ impl Default for Input {
         Self {
             keyboard_state: Default::default(),
             camera_zoom: 0.,
+            click_position: None,
         }
     }
 }

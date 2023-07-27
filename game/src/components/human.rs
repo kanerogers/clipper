@@ -2,7 +2,7 @@ use std::time::Instant;
 
 use common::{
     glam::Vec3,
-    rand, hecs::{RefMut, self},
+    rand, hecs::{self},
 };
 
 use crate::beacon::Beacon;
