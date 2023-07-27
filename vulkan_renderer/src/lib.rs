@@ -110,6 +110,12 @@ impl Renderer for LazyVulkan {
         self.renderer
             .update_surface(new_render_surface, &self.context.device);
     }
+
+    fn cleanup(&mut self) {
+        unsafe {
+            self.renderer.cleanup(&self.context.device);
+        }
+    }
 }
 
 impl LazyVulkan {

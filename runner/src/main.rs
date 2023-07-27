@@ -23,6 +23,7 @@ mod hot_game {
 
 pub fn init<R: Renderer>() -> (R, EventLoop<()>, GUI) {
     env_logger::init();
+    log::debug!("Debug logging enabled");
     let event_loop = winit::event_loop::EventLoop::new();
     let size = winit::dpi::LogicalSize::new(800, 600);
 
@@ -45,13 +46,9 @@ type RendererImpl = MetalRenderer;
 type RendererImpl = LazyVulkan;
 
 fn main() {
-    println!("Uh, hello?");
-
+    println!("Starting clipper!");
     let (mut renderer, mut event_loop, mut gui) = init::<RendererImpl>();
-
-    // let (gui_vulkan_context, gui_render_surface) = get_gui_properties(&graphics, &renderer);
     let mut game = hot_game::init();
-    // let mut gui = hot_gui::gui_init(&gui_vulkan_context, gui_render_surface);
 
     // Off we go!
     let mut winit_initializing = true;
@@ -103,10 +100,7 @@ fn main() {
         }
     });
 
-    // I guess we better do this or else the Dreaded Validation Layers will complain
-    // unsafe {
-    //     renderer.cleanup(&graphics.context().device);
-    // }
+    renderer.cleanup();
 }
 
 fn window_tick<R: Renderer>(game: &mut hot_game::Game, renderer: &mut R, gui: &mut GUI) {

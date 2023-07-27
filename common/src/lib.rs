@@ -2,6 +2,7 @@ pub use bitflags;
 pub use glam;
 pub use hecs;
 pub use rand;
+pub use rapier3d;
 pub use winit;
 pub use yakui;
 
@@ -90,4 +91,5 @@ pub trait Renderer {
     fn init(window: winit::window::Window) -> Self;
     fn render(&mut self, meshes: &[Mesh], camera: Camera, yak: &mut yakui::Yakui);
     fn resized(&mut self, size: winit::dpi::PhysicalSize<u32>);
+    fn cleanup(&mut self);
 }

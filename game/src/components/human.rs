@@ -1,17 +1,16 @@
 use std::time::Instant;
 
 use common::{
-    glam::{Affine3A, Vec3},
-    rand, Mesh,
+    glam::Vec3,
+    rand, hecs::{RefMut, self},
 };
 
-use crate::{beacon::Beacon, Game};
+use crate::beacon::Beacon;
+
+use super::Transform;
 
 #[derive(Clone, Debug)]
 pub struct Human {
-    pub mesh: Mesh,
-    pub position: Vec3,
-    pub velocity: Vec3,
     pub state: State,
     last_update: Instant,
 }
@@ -19,9 +18,6 @@ pub struct Human {
 impl Default for Human {
     fn default() -> Self {
         Self {
-            mesh: Default::default(),
-            position: Default::default(),
-            velocity: Default::default(),
             last_update: Instant::now(),
             state: State::Free,
         }
@@ -29,33 +25,8 @@ impl Default for Human {
 }
 
 impl Human {
-    pub fn new(position: Vec3) -> Self {
-        let mesh = Mesh {
-            geometry: common::Geometry::Cube,
-            transform: Affine3A::from_translation(position),
-            colour: Some([0., 1., 0.].into()),
-            ..Default::default()
-        };
-        Self {
-            position,
-            mesh,
-            ..Default::default()
-        }
-    }
-
-    pub fn update(&mut self, dt: f32, dave_position: Vec3, nearest_beacon: Option<&mut Beacon>) {
-        self.state
-            .update(dt, self.position, dave_position, nearest_beacon);
-        self.set_velocity(self.state, dave_position);
-
-        let displacement = self.velocity * dt;
-        self.position += displacement;
-        self.mesh.colour = Some(self.state.get_colour());
-        self.mesh.transform = Affine3A::from_translation(self.position);
-    }
-
-    fn set_velocity(&mut self, state: State, dave_position: Vec3) {
-        match state {
+    pub fn update_velocity(&mut self, velocity: &mut Vec3, position: Vec3, dave_position: Vec3) {
+        match self.state {
             State::Free | State::BeingBrainwashed(_) => {
                 if Instant::now()
                     .duration_since(self.last_update)
@@ -63,26 +34,28 @@ impl Human {
                     > 1.0
                 {
                     self.last_update = Instant::now();
-                    self.velocity = random_movement();
+                    *velocity = random_movement();
 
                     if rand::random() {
-                        self.velocity = self.velocity.normalize() * 4.;
+                        *velocity = velocity.normalize() * 4.;
                     } else {
-                        self.velocity = self.velocity.normalize() * -4.;
+                        *velocity = velocity.normalize() * -4.;
                     }
                 }
             }
             State::Following | State::BecomingWorker(_) => {
-                self.velocity = (dave_position - self.position).normalize();
+                *velocity = (dave_position - position).normalize() * 2.;
             }
             State::Working => {
-                self.velocity = Default::default();
+                *velocity = Default::default();
             }
         }
     }
+
 }
 
-#[derive(Clone, Debug, Copy)]
+
+#[derive(Clone, Debug, Copy, PartialEq, PartialOrd)]
 pub enum State {
     Free,
     BeingBrainwashed(f32),
@@ -101,10 +74,12 @@ const BEACON_TAKEOVER_THRESHOLD: f32 = 10.;
 impl State {
     pub fn update(
         &mut self,
+        world: &hecs::World,
         dt: f32,
         current_position: Vec3,
         dave_position: Vec3,
-        nearest_beacon: Option<&mut Beacon>,
+        nearest_beacon: Option<hecs::Entity>,
+        me: hecs::Entity,
     ) {
         let distance_to_dave = current_position.distance(dave_position);
         let within_brainwash_threshold = distance_to_dave <= BRAINWASH_DISTANCE_THRESHOLD;
@@ -130,22 +105,26 @@ impl State {
                     *self = State::Free;
                 }
 
-                let Some(nearest_beacon) = nearest_beacon else { return };
-                if nearest_beacon.position.distance(current_position) <= BEACON_TAKEOVER_THRESHOLD {
+                let Some(nearest_beacon_entity) = nearest_beacon else { return };
+                let beacon_position = world.get::<&Transform>(nearest_beacon_entity).unwrap().position;
+                if beacon_position.distance(current_position) <= BEACON_TAKEOVER_THRESHOLD {
                     *self = State::BecomingWorker(0.);
                 }
             }
             State::BecomingWorker(ref mut amount) => {
-                let Some(nearest_beacon) = nearest_beacon else { 
+                let Some(nearest_beacon_entity) = nearest_beacon else { 
                     *self = State::Free; 
                     return 
                 };
-                let distance_to_beacon = nearest_beacon.position.distance(current_position);
-                if distance_to_beacon <= BEACON_TAKEOVER_THRESHOLD {
+                let beacon_position = world.get::<&Transform>(nearest_beacon_entity).unwrap().position;
+                let mut beacon = world.get::<&mut Beacon>(nearest_beacon_entity).unwrap();
+
+                if beacon_position.distance(current_position) <= BEACON_TAKEOVER_THRESHOLD {
                     *amount += dt;
                 }
 
                 if *amount >= BRAINWASH_TIME {
+                    beacon.workers.insert(me);
                     *self = State::Working;
                 }
             }
@@ -169,36 +148,7 @@ impl State {
     }
 }
 
-pub fn humans(game: &mut Game) {
-    // let dt = game.time.delta();
-    // let dave_position = game.dave.position;
-    // let gui_state = &mut game.gui_state;
-    // gui_state.paperclips = 0;
-    // gui_state.workers = 0;
-    // for human in &mut game.humans {
-    //     let nearest_beacon = find_nearest_beacon(human.position, &mut game.beacons);
-    //     human.update(dt, dave_position, nearest_beacon);
 
-    //     match &human.state {
-    //         State::Working => gui_state.workers += 1,
-    //         _ => {},
-    //     }
-    // }
-}
-
-fn find_nearest_beacon(position: Vec3, beacons: &mut [Beacon]) -> Option<&mut Beacon> {
-    let mut shortest_distance_found = f32::INFINITY;
-    let mut nearest_beacon = None;
-    for beacon in beacons {
-        let distance = position.distance(beacon.position);
-        if distance <= shortest_distance_found {
-            shortest_distance_found = distance;
-            nearest_beacon = Some(beacon);
-        }
-    }
-
-    nearest_beacon
-}
 
 fn random_movement() -> Vec3 {
     let x: f32 = rand::random();

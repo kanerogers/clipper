@@ -1,25 +1,44 @@
 pub mod beacon;
 pub mod components;
-pub mod dave;
-pub mod human;
+mod systems;
 pub mod time;
 
-use beacon::Beacon;
 pub use common::Mesh;
 use common::{
     bitflags::bitflags,
     glam::{Quat, Vec3},
-    hecs, Camera, GUIState, Geometry, Material,
+    hecs, rand, Camera, GUIState, Geometry, Material,
 };
-use components::Transform;
-use dave::Dave;
-use human::{humans, Human};
+use components::{Dave, Human, HumanState, Transform, Velocity};
 use std::f32::consts::TAU;
+use systems::{beacons, dave_controller, humans, physics, PhysicsContext};
 use time::Time;
+
+use crate::beacon::Beacon;
 
 pub const PLAYER_SPEED: f32 = 7.;
 pub const CAMERA_ZOOM_SPEED: f32 = 10.;
 pub const CAMERA_ROTATE_SPEED: f32 = 3.;
+
+// required due to reasons
+#[no_mangle]
+pub fn init() -> Game {
+    Game::new()
+}
+
+#[no_mangle]
+pub fn tick(game: &mut Game, gui_state: &mut GUIState) -> Vec<Mesh> {
+    while game.time.start_update() {
+        update_camera(game);
+        dave_controller(game);
+        humans(game);
+        physics(game);
+        beacons(game);
+        update_gui_state(game, gui_state);
+    }
+
+    game.meshes()
+}
 
 pub struct Game {
     pub world: hecs::World,
@@ -27,6 +46,7 @@ pub struct Game {
     pub dave: hecs::Entity,
     pub input: Input,
     pub camera: Camera,
+    pub physics_context: PhysicsContext,
 }
 
 impl Default for Game {
@@ -37,6 +57,7 @@ impl Default for Game {
             dave: hecs::Entity::DANGLING,
             input: Default::default(),
             camera: Default::default(),
+            physics_context: Default::default(),
         }
     }
 }
@@ -45,17 +66,48 @@ impl Game {
     pub fn new() -> Self {
         let mut camera = Camera::default();
         let mut world = hecs::World::new();
+
+        // dave
         let dave = world.spawn((
             Dave::default(),
             Geometry::Sphere,
             Material::from_colour([0., 0., 1.].into()),
             Transform::from_translation([0., 2., 0.].into()),
+            Velocity::default(),
         ));
+
         // terrain
         world.spawn(get_grid());
+
+        const STARTING_HUMANS: usize = 10;
+        for _ in 0..STARTING_HUMANS {
+            let x = (rand::random::<f32>() * 50.) - 25.;
+            let z = (rand::random::<f32>() * 50.) - 25.;
+            world.spawn((
+                Human::default(),
+                Geometry::Cube,
+                Material::from_colour([0., 1., 0.].into()),
+                Transform::from_translation([x, 1., z].into()),
+                Velocity::default(),
+            ));
+        }
+
+        // beacon
+        world.spawn((
+            Beacon::default(),
+            Geometry::Cube,
+            Material::from_colour([0., 0., 0.].into()),
+            Transform::new(
+                [0.0, 0.0, 0.0].into(),
+                Default::default(),
+                [2.0, 20., 2.0].into(),
+            ),
+            Velocity::default(),
+        ));
+
         camera.position.y = 3.;
         camera.position.z = 12.;
-        camera.distance = 10.;
+        camera.distance = 50.;
         camera.desired_distance = camera.distance;
         camera.start_distance = camera.distance;
         Self {
@@ -142,12 +194,9 @@ fn rgb_to_vec(r: usize, g: usize, b: usize) -> Vec3 {
     [r as f32 / 255., g as f32 / 255., b as f32 / 255.].into()
 }
 
-pub fn dave(game: &mut Game) {
-    let dt = game.time.delta();
-    // game.dave.update(dt, &game.input, &game.camera.transform());
-}
 pub fn update_camera(game: &mut Game) {
     let camera = &mut game.camera;
+    camera.target = game.world.get::<&Transform>(game.dave).unwrap().position;
     let input = &game.input;
     let dt = game.time.delta();
 
@@ -194,19 +243,11 @@ fn set_camera_distance(input: &Input, camera: &mut Camera, dt: f32) {
     }
 }
 
-#[no_mangle]
-pub fn tick(game: &mut Game, gui_state: &mut GUIState) -> Vec<Mesh> {
-    while game.time.start_update() {
-        update_camera(game);
-        dave(game);
-        humans(game);
-    }
-
-    game.meshes()
-}
-
-// required due to reasons
-#[no_mangle]
-pub fn init() -> Game {
-    Game::new()
+fn update_gui_state(game: &mut Game, gui_state: &mut GUIState) {
+    gui_state.workers = game
+        .world
+        .query_mut::<&Human>()
+        .into_iter()
+        .filter(|(_, h)| h.state == HumanState::Working)
+        .count();
 }

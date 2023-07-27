@@ -47,11 +47,6 @@ fn draw_gui(gui_state: &GUIState) {
             let mut col = List::column();
             col.main_axis_size = MainAxisSize::Min;
             col.show(|| {
-                #[cfg(target_os = "macos")]
-                text(40., format!("Running on METAL baby"));
-
-                #[cfg(any(target_os = "windows", target_os = "linux"))]
-                text(40., format!("Running on VULKAN baby"));
                 text(40., format!("Workers: {worker_count}"));
                 text(40., format!("Paperclips: {paperclip_count}"));
             });
