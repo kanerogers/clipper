@@ -30,15 +30,11 @@ impl GUI {
             [width as f32, height as f32].into(),
         ));
     }
-
-    pub fn update(&mut self) {
-        self.yak.start();
-        draw_gui(&self.state);
-        self.yak.finish();
-    }
 }
 
-fn draw_gui(gui_state: &GUIState) {
+#[no_mangle]
+pub fn draw_gui(gui_state: &GUIState, gui: &mut GUI) {
+    gui.yak.start();
     use yakui::{colored_box_container, row, text, widgets::List, Color};
     let paperclip_count = gui_state.paperclips;
     let worker_count = gui_state.workers;
@@ -51,8 +47,9 @@ fn draw_gui(gui_state: &GUIState) {
             col.show(|| {
                 text(40., format!("Workers: {worker_count}"));
                 text(40., format!("Paperclips: {paperclip_count}"));
-                text(20., format!("Selected worker: {selected_worker}"));
+                text(20., format!("Comrade worker: {selected_worker}"));
             });
         });
     });
+    gui.yak.finish();
 }

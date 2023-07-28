@@ -13,7 +13,7 @@ use common::{
     winit::{self},
     Camera, GUIState, Geometry, Line, Material,
 };
-use components::{Dave, Human, HumanState, Transform, Velocity};
+use components::{Dave, Human, HumanState, Selected, Transform, Velocity};
 use std::f32::consts::TAU;
 use systems::{beacons, click_system, dave_controller, from_na, humans, physics, PhysicsContext};
 use time::Time;
@@ -23,7 +23,7 @@ use crate::{beacon::Beacon, components::Info};
 pub const PLAYER_SPEED: f32 = 7.;
 pub const CAMERA_ZOOM_SPEED: f32 = 10.;
 pub const CAMERA_ROTATE_SPEED: f32 = 3.;
-const RENDER_DEBUG_LINES: bool = true;
+const RENDER_DEBUG_LINES: bool = false;
 
 // required due to reasons
 #[no_mangle]
@@ -311,4 +311,12 @@ fn update_gui_state(game: &mut Game, gui_state: &mut GUIState) {
         .into_iter()
         .filter(|(_, h)| h.state == HumanState::Working)
         .count();
+
+    gui_state.selected_worker = game
+        .world
+        .query_mut::<&Info>()
+        .with::<(&Human, &Selected)>()
+        .into_iter()
+        .next()
+        .map(|(_, i)| i.name.clone());
 }

@@ -7,3 +7,6 @@ version = "0.1.0"
 
 [dependencies]
 common = {path = "../common"}
+
+[lib]
+crate-type = ["cdylib", "rlib"]

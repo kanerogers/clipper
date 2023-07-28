@@ -97,8 +97,9 @@ pub struct Info {
 
 impl Info {
     pub fn new<S: Into<String>>(name: S) -> Self {
-        Self {
-            name: name.into()
-        }
+        Self { name: name.into() }
     }
 }
+
+#[derive(Debug, Clone, Default)]
+pub struct Selected;

@@ -1,4 +1,3 @@
-use gui::GUI;
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 use vulkan_renderer::LazyVulkan;
 
@@ -24,10 +23,17 @@ mod hot_game {
     pub use game::{Game, Keys, Mesh};
 }
 
+#[hot_lib_reloader::hot_module(dylib = "gui", file_watch_debounce = 20, lib_dir = "target/debug")]
+mod hot_gui {
+    hot_functions_from_file!("gui/src/lib.rs");
+
+    pub use gui::GUI;
+}
+
 const INITIAL_SCREEN_WIDTH: u32 = 800;
 const INITIAL_SCREEN_HEIGHT: u32 = 600;
 
-pub fn init<R: Renderer>() -> (R, EventLoop<()>, GUI, hot_game::Game) {
+pub fn init<R: Renderer>() -> (R, EventLoop<()>, hot_gui::GUI, hot_game::Game) {
     env_logger::init();
     log::debug!("Debug logging enabled");
     let event_loop = winit::event_loop::EventLoop::new();
@@ -42,7 +48,7 @@ pub fn init<R: Renderer>() -> (R, EventLoop<()>, GUI, hot_game::Game) {
     game.resized(window.inner_size());
 
     let renderer = R::init(window);
-    let gui = GUI::new(INITIAL_SCREEN_WIDTH, INITIAL_SCREEN_HEIGHT);
+    let gui = hot_gui::GUI::new(INITIAL_SCREEN_WIDTH, INITIAL_SCREEN_HEIGHT);
 
     (renderer, event_loop, gui, game)
 }
@@ -86,7 +92,7 @@ fn main() {
                 if winit_initializing {
                     return;
                 } else {
-                    game.window_size = size;
+                    game.resized(size);
                     gui.resized(size.width, size.height);
                     renderer.resized(size);
                 }
@@ -99,14 +105,14 @@ fn main() {
     renderer.cleanup();
 }
 
-fn window_tick<R: Renderer>(game: &mut hot_game::Game, renderer: &mut R, gui: &mut GUI) {
+fn window_tick<R: Renderer>(game: &mut hot_game::Game, renderer: &mut R, gui: &mut hot_gui::GUI) {
     let meshes = {
         game.time.start_frame();
         hot_game::tick(game, &mut gui.state)
     };
 
     game.input.camera_zoom = 0.;
+    hot_gui::draw_gui(&game.gui_state, gui);
 
-    gui.update();
     renderer.render(&meshes, &game.debug_lines, game.camera, &mut gui.yak);
 }
