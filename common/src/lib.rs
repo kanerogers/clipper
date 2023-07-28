@@ -1,6 +1,9 @@
+use std::collections::VecDeque;
+
 pub use bitflags;
 pub use glam;
 pub use hecs;
+use hecs::Entity;
 pub use log;
 pub use rand;
 pub use rapier3d;
@@ -125,19 +128,38 @@ impl Camera {
 #[derive(Debug, Clone, Default)]
 pub struct GUIState {
     pub paperclips: usize,
-    pub workers: usize,
-    pub selected_item: Option<SelectedItemInfo>,
+    pub idle_workers: usize,
+    pub selected_item: Option<(Entity, SelectedItemInfo)>,
+    pub command_queue: VecDeque<GUICommand>,
 }
 
 #[derive(Debug, Clone)]
 pub enum SelectedItemInfo {
     Human(HumanInfo),
+    PlaceOfWork(PlaceOfWorkInfo),
+    Storage(StorageInfo),
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct HumanInfo {
     pub name: String,
     pub state: String,
+    pub inventory: String,
+    pub place_of_work: String,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct PlaceOfWorkInfo {
+    pub name: String,
+    pub task: String,
+    pub workers: usize,
+    pub max_workers: usize,
+    pub stock: String,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct StorageInfo {
+    pub stock: String,
 }
 
 pub trait Renderer {
@@ -157,4 +179,10 @@ impl Line {
     pub fn new(start: glam::Vec3, end: glam::Vec3, colour: glam::Vec3) -> Self {
         Self { start, end, colour }
     }
+}
+
+#[derive(Debug, Clone)]
+pub enum GUICommand {
+    SetWorkerCount(Entity, usize),
+    Liquify(Entity),
 }

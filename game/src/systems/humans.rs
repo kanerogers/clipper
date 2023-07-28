@@ -1,49 +1,44 @@
-use common::{glam::Vec3, hecs, Material};
+use common::Material;
 
 use crate::{
-    beacon::Beacon,
     components::{Human, Transform, Velocity},
     Game,
 };
 
-pub fn humans(game: &mut Game) {
+pub fn update_human_position(game: &mut Game) {
     let world = &game.world;
     let dt = game.time.delta();
     let dave_position = world.get::<&Transform>(game.dave).unwrap().position;
 
-    for (human_entity, (human, velocity, transform, material)) in game
-        .world
-        .query::<(&mut Human, &mut Velocity, &mut Transform, &mut Material)>()
+    for (_, (human, velocity, transform)) in world
+        .query::<(&mut Human, &mut Velocity, &mut Transform)>()
         .iter()
     {
-        let position = transform.position;
-        let nearest_beacon = find_nearest_beacon(&position, world);
-        human.state.update(
-            world,
-            dt,
-            position,
+        human.update_velocity(
+            &mut velocity.linear,
+            transform.position,
             dave_position,
-            nearest_beacon,
-            human_entity,
+            world,
         );
-        human.update_velocity(&mut velocity.linear, transform.position, dave_position);
         let displacement = velocity.linear * dt;
         transform.position += displacement;
         transform.position.y = 1.;
+    }
+}
+
+pub fn update_human_colour(game: &mut Game) {
+    let world = &game.world;
+    for (_, (human, material)) in world.query::<(&mut Human, &mut Material)>().iter() {
         material.colour = human.state.get_colour();
     }
 }
 
-fn find_nearest_beacon<'a>(position: &Vec3, world: &'a hecs::World) -> Option<hecs::Entity> {
-    let mut shortest_distance_found = f32::INFINITY;
-    let mut nearest_beacon = None;
-    for (entity, (transform, _beacon)) in world.query::<(&Transform, &'a mut Beacon)>().iter() {
-        let distance = position.distance(transform.position);
-        if distance <= shortest_distance_found {
-            shortest_distance_found = distance;
-            nearest_beacon = Some(entity);
-        }
-    }
+pub fn update_human_state(game: &mut Game) {
+    let world = &game.world;
+    let dt = game.time.delta();
+    let dave_position = world.get::<&Transform>(game.dave).unwrap().position;
 
-    nearest_beacon
+    for (me, (human, transform)) in world.query::<(&mut Human, &mut Transform)>().iter() {
+        human.update_state(transform.position, dave_position, world, dt, me);
+    }
 }

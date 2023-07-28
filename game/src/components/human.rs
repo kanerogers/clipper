@@ -7,12 +7,15 @@ use common::{
 
 use crate::beacon::Beacon;
 
-use super::Transform;
+use super::{Transform, PlaceOfWork, Inventory, ResourceDestination, Storage, Task, Resource};
+
 
 #[derive(Clone, Debug)]
 pub struct Human {
     pub state: State,
     last_update: Instant,
+    pub inventory: Inventory,
+    pub place_of_work: Option<hecs::Entity>,
 }
 
 impl Default for Human {
@@ -20,12 +23,14 @@ impl Default for Human {
         Self {
             last_update: Instant::now(),
             state: State::Free,
+            inventory: Default::default(),
+            place_of_work: None,
         }
     }
 }
 
 impl Human {
-    pub fn update_velocity(&mut self, velocity: &mut Vec3, position: Vec3, dave_position: Vec3) {
+    pub fn update_velocity(&mut self, velocity: &mut Vec3, current_position: Vec3, dave_position: Vec3, world: &hecs::World) {
         match self.state {
             State::Free | State::BeingBrainwashed(_) => {
                 if Instant::now()
@@ -44,12 +49,34 @@ impl Human {
                 }
             }
             State::Following | State::BecomingWorker(_) => {
-                *velocity = (dave_position - position).normalize() * 2.;
+                *velocity = (dave_position - current_position).normalize() * 2.;
             }
-            State::Working => {
+            State::GoingToPlaceOfWork => {
+                    let place_of_work_position = world.get::<&Transform>(self.place_of_work.unwrap()).unwrap().position;
+                        *velocity = (place_of_work_position - current_position).normalize() * 2.;
+            }
+            State::DroppingOffResource(destination) => {
+                    let destination_position = world.get::<&Transform>(destination).unwrap().position;
+                        *velocity = (destination_position - current_position).normalize() * 2.;
+            }
+            _ => {
                 *velocity = Default::default();
             }
         }
+    }
+
+    pub fn update_state(&mut self, current_position: Vec3, dave_position: Vec3, world: &hecs::World, dt: f32, me: hecs::Entity) {
+        self.state.update(world, dt, current_position, dave_position, me, self.place_of_work.clone(), &mut self.inventory)
+    }
+
+    pub fn assign_place_of_work(&mut self, place_of_work_entity: hecs::Entity) {
+        self.place_of_work = Some(place_of_work_entity);
+        self.state = State::GoingToPlaceOfWork;
+    }
+
+    pub fn unassign_work(&mut self) {
+        self.place_of_work = None;
+        self.state = State::AwaitingAssignment;
     }
 
 }
@@ -61,13 +88,18 @@ pub enum State {
     BeingBrainwashed(f32),
     Following,
     BecomingWorker(f32),
-    Working,
+    AwaitingAssignment,
+    GoingToPlaceOfWork,
+    Working(f32),
+    DroppingOffResource(hecs::Entity),
 }
 
 const FREE_COLOUR: Vec3 = Vec3::new(1., 0., 0.);
 const FOLLOWING_COLOUR: Vec3 = Vec3::new(0., 0., 1.);
-const WORKING_COLOUR: Vec3 = Vec3::new(0., 1., 0.);
+const AWAITING_ASSIGNMENT_COLOUR: Vec3 = Vec3::new(1., 0.85, 0.);
+const WORKING_COLOUR: Vec3 = Vec3::new(0., 0.85, 0.);
 const BRAINWASH_TIME: f32 = 5.;
+const WORK_TIME: f32 = 5.;
 const BRAINWASH_DISTANCE_THRESHOLD: f32 = 5.0;
 const BEACON_TAKEOVER_THRESHOLD: f32 = 10.;
 
@@ -78,25 +110,27 @@ impl State {
         dt: f32,
         current_position: Vec3,
         dave_position: Vec3,
-        nearest_beacon: Option<hecs::Entity>,
         me: hecs::Entity,
+        place_of_work_entity: Option<hecs::Entity>,
+        inventory: &mut Inventory,
     ) {
         let distance_to_dave = current_position.distance(dave_position);
         let within_brainwash_threshold = distance_to_dave <= BRAINWASH_DISTANCE_THRESHOLD;
+        let nearest_beacon = find_nearest_beacon(&current_position, world);
         match self {
             State::Free => {
                 if within_brainwash_threshold {
                     *self = State::BeingBrainwashed(0.);
                 }
             }
-            State::BeingBrainwashed(ref mut amount) => {
+            State::BeingBrainwashed(brainwash_time_elapsed) => {
                 if within_brainwash_threshold {
-                    *amount += dt;
+                    *brainwash_time_elapsed += dt;
                 } else {
                     *self = State::Free;
                     return;
                 }
-                if *amount >= BRAINWASH_TIME {
+                if *brainwash_time_elapsed >= BRAINWASH_TIME {
                     *self = State::Following;
                 }
             }
@@ -111,7 +145,7 @@ impl State {
                     *self = State::BecomingWorker(0.);
                 }
             }
-            State::BecomingWorker(ref mut amount) => {
+            State::BecomingWorker(brainwash_time_elapsed) => {
                 let Some(nearest_beacon_entity) = nearest_beacon else { 
                     *self = State::Free; 
                     return 
@@ -120,15 +154,67 @@ impl State {
                 let mut beacon = world.get::<&mut Beacon>(nearest_beacon_entity).unwrap();
 
                 if beacon_position.distance(current_position) <= BEACON_TAKEOVER_THRESHOLD {
-                    *amount += dt;
+                    *brainwash_time_elapsed += dt;
                 }
 
-                if *amount >= BRAINWASH_TIME {
+                if *brainwash_time_elapsed >= BRAINWASH_TIME {
                     beacon.workers.insert(me);
-                    *self = State::Working;
+                    *self = State::AwaitingAssignment;
                 }
             }
-            State::Working => {}
+            State::AwaitingAssignment => {}
+            State::GoingToPlaceOfWork => {
+                let place_of_work_position = world.get::<&Transform>(place_of_work_entity.unwrap()).unwrap().position;
+                if place_of_work_position.distance(current_position) <= 2.0 {
+                    *self = State::Working(0.);
+                }
+            }
+            State::DroppingOffResource(destination_entity) => {
+                let destination_position = world.get::<&Transform>(*destination_entity).unwrap().position;
+                let resource = world.get::<&mut PlaceOfWork>(place_of_work_entity.unwrap()).unwrap().task.resource();
+                if destination_position.distance(current_position) <= 2.0 {
+                    let mut destination_inventory = world.get::<&mut Inventory>(*destination_entity).unwrap();
+                    if let Some(amount) = inventory.take(1, &resource) {
+                        destination_inventory.add(resource, amount);
+                    }
+                    *self = State::GoingToPlaceOfWork;
+                }
+            }
+            State::Working(work_time_elapsed) => {
+                if *work_time_elapsed >= WORK_TIME {
+                    let task = world.get::<&mut PlaceOfWork>(place_of_work_entity.unwrap()).unwrap().task;
+                    let producing_resource = task.resource();
+                    let mut work_inventory = world.get::<&mut Inventory>(place_of_work_entity.unwrap()).unwrap();
+                    if let Some(amount_produced) = match task {
+                        Task::Gather => {
+                            work_inventory.take(1, &producing_resource)
+                        }
+                        Task::Smelt => {
+                            work_inventory.take(1, &Resource::RawIron)
+                        }
+                        Task::MakePaperclips => {
+                            work_inventory.take(1, &Resource::Iron)
+                        }
+                    } {
+                        let destination = match producing_resource.destination() {
+                            ResourceDestination::Storage => {
+                                world.query::<()>().with::<&Storage>().iter().next().unwrap().0
+                            },
+                            ResourceDestination::PlaceOfWork(place) => {
+                                world.query::<&PlaceOfWork>().iter().find(|r| r.1.place_type == place).unwrap().0
+                            }
+                        };
+                        *self = State::DroppingOffResource(destination);
+                        inventory.add(producing_resource, amount_produced);
+                    } else {
+                        println!("Unable to complete task!");
+                        *self = State::AwaitingAssignment;
+                    }
+                    return;
+                }
+
+                *work_time_elapsed += dt;
+            }
         }
     }
     pub fn get_colour(&self) -> Vec3 {
@@ -141,9 +227,10 @@ impl State {
             State::Following => FOLLOWING_COLOUR,
             State::BecomingWorker(amount) => {
                 let brainwashed_percentage = *amount as f32 / BRAINWASH_TIME as f32;
-                FOLLOWING_COLOUR.lerp(WORKING_COLOUR, brainwashed_percentage)
+                FOLLOWING_COLOUR.lerp(AWAITING_ASSIGNMENT_COLOUR, brainwashed_percentage)
             }
-            State::Working => WORKING_COLOUR,
+            State::AwaitingAssignment => AWAITING_ASSIGNMENT_COLOUR,
+            _ => WORKING_COLOUR,
         }
     }
 }
@@ -155,4 +242,18 @@ fn random_movement() -> Vec3 {
     let z: f32 = rand::random();
 
     [x, 0., z].into()
+}
+
+fn find_nearest_beacon<'a>(position: &Vec3, world: &'a hecs::World) -> Option<hecs::Entity> {
+    let mut shortest_distance_found = f32::INFINITY;
+    let mut nearest_beacon = None;
+    for (entity, (transform, _beacon)) in world.query::<(&Transform, &'a mut Beacon)>().iter() {
+        let distance = position.distance(transform.position);
+        if distance <= shortest_distance_found {
+            shortest_distance_found = distance;
+            nearest_beacon = Some(entity);
+        }
+    }
+
+    nearest_beacon
 }

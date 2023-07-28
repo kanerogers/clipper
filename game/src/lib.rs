@@ -11,14 +11,20 @@ use common::{
     hecs, rand,
     rapier3d::prelude::Ray,
     winit::{self},
-    Camera, GUIState, Geometry, HumanInfo, Line, Material, SelectedItemInfo,
+    Camera, GUIState, Geometry, HumanInfo, Line, Material, PlaceOfWorkInfo, SelectedItemInfo,
 };
-use components::{Dave, Human, HumanState, Selected, Transform, Velocity};
-use std::f32::consts::TAU;
-use systems::{beacons, click_system, dave_controller, from_na, humans, physics, PhysicsContext};
+use components::{Dave, Human, HumanState, Inventory, Selected, Transform, Velocity};
+use std::{collections::VecDeque, f32::consts::TAU};
+use systems::{
+    beacons, click_system, dave_controller, from_na, physics, update_human_colour,
+    update_human_position, update_human_state, PhysicsContext,
+};
 use time::Time;
 
-use crate::{beacon::Beacon, components::Info};
+use crate::{
+    beacon::Beacon,
+    components::{Info, PlaceOfWork, Resource, Storage},
+};
 
 pub const PLAYER_SPEED: f32 = 7.;
 pub const CAMERA_ZOOM_SPEED: f32 = 10.;
@@ -35,10 +41,13 @@ pub fn init() -> Game {
 pub fn tick(game: &mut Game, gui_state: &mut GUIState) -> Vec<Mesh> {
     while game.time.start_update() {
         game.debug_lines.clear();
+        process_gui_command_queue(game, &mut gui_state.command_queue);
         update_camera(game);
         click_system(game);
         dave_controller(game);
-        humans(game);
+        update_human_state(game);
+        update_human_position(game);
+        update_human_colour(game);
         physics(game);
         beacons(game);
         update_gui_state(game, gui_state);
@@ -61,6 +70,45 @@ pub fn tick(game: &mut Game, gui_state: &mut GUIState) -> Vec<Mesh> {
     }
 
     game.meshes()
+}
+
+fn process_gui_command_queue(game: &mut Game, command_queue: &mut VecDeque<common::GUICommand>) {
+    let world = &mut game.world;
+    for command in command_queue.drain(..) {
+        println!("Processing command: {command:?}");
+
+        match command {
+            common::GUICommand::SetWorkerCount(place_of_work_entity, desired_worker_count) => {
+                let mut place_of_work =
+                    world.get::<&mut PlaceOfWork>(place_of_work_entity).unwrap();
+                let current_workers = place_of_work.workers.len();
+                if desired_worker_count > current_workers {
+                    if let Some(worker_entity) = find_available_worker(world) {
+                        place_of_work.workers.push_front(worker_entity);
+                        let mut worker = world.get::<&mut Human>(worker_entity).unwrap();
+                        worker.assign_place_of_work(place_of_work_entity);
+                    }
+                } else {
+                    if let Some(worker_entity) = place_of_work.workers.pop_back() {
+                        let mut worker = world.get::<&mut Human>(worker_entity).unwrap();
+                        worker.unassign_work();
+                    }
+                }
+            }
+            common::GUICommand::Liquify(entity) => world.despawn(entity).unwrap(),
+        }
+    }
+}
+
+fn find_available_worker(world: &hecs::World) -> Option<hecs::Entity> {
+    let mut query = world.query::<&Human>();
+    for (entity, human) in query.iter() {
+        if human.state == HumanState::AwaitingAssignment {
+            return Some(entity);
+        }
+    }
+
+    None
 }
 
 #[no_mangle]
@@ -140,6 +188,66 @@ impl Game {
             ),
             Velocity::default(),
             Info::new("Beacon"),
+        ));
+
+        // mine
+        world.spawn((
+            Geometry::Cube,
+            Material::from_colour([0.2, 0.2, 0.2].into()),
+            Transform::new(
+                [20.0, 0.0, 0.0].into(),
+                Default::default(),
+                [5.0, 1., 5.0].into(),
+            ),
+            Velocity::default(),
+            PlaceOfWork::mine(),
+            Inventory::new([(Resource::RawIron, 5000)]),
+            Info::new("Mine"),
+        ));
+
+        // forge
+        world.spawn((
+            Geometry::Cube,
+            Material::from_colour([0.2, 1.0, 0.2].into()),
+            Transform::new(
+                [-20., 0.0, 0.0].into(),
+                Default::default(),
+                [2.0, 3., 2.0].into(),
+            ),
+            Velocity::default(),
+            PlaceOfWork::forge(),
+            Inventory::new([]),
+            Info::new("Forge"),
+        ));
+
+        // factory
+        world.spawn((
+            Geometry::Cube,
+            Material::from_colour([1.0, 105.0 / 255.0, 180.0 / 255.0].into()),
+            Transform::new(
+                [20., 0.0, 30.0].into(),
+                Default::default(),
+                [2.0, 3., 2.0].into(),
+            ),
+            Velocity::default(),
+            PlaceOfWork::factory(),
+            Inventory::new([]),
+            Info::new("Forge"),
+        ));
+
+        // storage
+        world.spawn((
+            Geometry::Cube,
+            Material::from_colour([1.0, 0.8, 0.].into()),
+            Transform::new(
+                [-20., 0.0, -30.0].into(),
+                Default::default(),
+                [2.0, 3., 2.0].into(),
+            ),
+            Velocity::default(),
+            Storage,
+            Inventory::new([]),
+            Info::new("Storage"),
         ));
 
         camera.position.y = 3.;
@@ -305,24 +413,80 @@ fn set_camera_distance(input: &Input, camera: &mut Camera, dt: f32) {
 }
 
 fn update_gui_state(game: &mut Game, gui_state: &mut GUIState) {
-    gui_state.workers = game
+    gui_state.idle_workers = game
         .world
         .query_mut::<&Human>()
         .into_iter()
-        .filter(|(_, h)| h.state == HumanState::Working)
+        .filter(|(_, h)| h.state == HumanState::AwaitingAssignment)
         .count();
 
-    if let Some((_, human)) = game
+    gui_state.paperclips = game
         .world
-        .query_mut::<&Human>()
+        .query::<&Inventory>()
+        .with::<&Storage>()
+        .iter()
+        .map(|(_, i)| i.amount_of(Resource::Paperclip))
+        .sum();
+
+    if let Some((entity, human)) = game
+        .world
+        .query::<&Human>()
+        .with::<&Selected>()
+        .iter()
+        .next()
+    {
+        let place_of_work = human
+            .place_of_work
+            .map(|p| game.world.get::<&PlaceOfWork>(p).unwrap().place_type);
+        gui_state.selected_item = Some((
+            entity,
+            SelectedItemInfo::Human(HumanInfo {
+                inventory: format!("{:?}", human.inventory),
+                name: "Boris".into(),
+                state: format!("{:?}", human.state),
+                place_of_work: format!("{place_of_work:?}"),
+            }),
+        ));
+        return;
+    }
+
+    if let Some((entity, (place_of_work, inventory))) = game
+        .world
+        .query_mut::<(&PlaceOfWork, &Inventory)>()
         .with::<&Selected>()
         .into_iter()
         .next()
     {
-        gui_state.selected_item = Some(SelectedItemInfo::Human(HumanInfo {
-            name: "Boris".into(),
-            state: format!("{:?}", human.state),
-        }));
+        gui_state.selected_item = Some((
+            entity,
+            SelectedItemInfo::PlaceOfWork(PlaceOfWorkInfo {
+                name: format!("{:?}", place_of_work.place_type),
+                task: format!("{:?}", place_of_work.task),
+                workers: place_of_work.workers.len(),
+                max_workers: place_of_work.worker_capacity,
+                stock: format!("{inventory:?}"),
+            }),
+        ));
+        return;
+    }
+
+    if let Some((entity, (_, inventory))) = game
+        .world
+        .query_mut::<(&Storage, &Inventory)>()
+        .with::<&Selected>()
+        .into_iter()
+        .next()
+    {
+        gui_state.selected_item = Some((
+            entity,
+            SelectedItemInfo::PlaceOfWork(PlaceOfWorkInfo {
+                name: "Storage".into(),
+                task: "Storing things".into(),
+                workers: 0,
+                max_workers: 0,
+                stock: format!("{inventory:?}"),
+            }),
+        ));
         return;
     }
 

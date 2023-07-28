@@ -1,10 +1,13 @@
+use std::collections::VecDeque;
+
 pub use common::GUIState;
 use common::{
-    yakui::{self, button},
-    HumanInfo,
+    hecs,
+    yakui::{self, button, widgets::ListWidget},
+    GUICommand, HumanInfo, PlaceOfWorkInfo,
 };
 pub use yakui::geometry::Rect;
-use yakui::{MainAxisSize, colored_box_container, column, expanded, row, text, widgets, Color};
+use yakui::{colored_box_container, column, expanded, row, text, widgets, Color, MainAxisSize};
 pub struct GUI {
     pub yak: yakui::Yakui,
     pub state: GUIState,
@@ -36,43 +39,97 @@ impl GUI {
 
 #[no_mangle]
 pub fn draw_gui(gui: &mut GUI) {
-    let gui_state = &gui.state;
+    let gui_state = &mut gui.state;
     gui.yak.start();
     let paperclip_count = gui_state.paperclips;
-    let worker_count = gui_state.workers;
+    let idle_worker_count = gui_state.idle_workers;
+    let commands = &mut gui_state.command_queue;
     row(|| {
         colored_box_container(Color::rgba(0, 0, 0, 200), || {
             let mut col = widgets::List::column();
             col.main_axis_size = MainAxisSize::Min;
             col.show(|| {
-                text(30., format!("Workers: {worker_count}"));
+                text(30., format!("Idle Workers: {idle_worker_count}"));
                 text(30., format!("Paperclips: {paperclip_count}"));
             });
         });
         expanded(|| {});
 
-        if let Some(selected_item) = &gui_state.selected_item {
+        if let Some((entity, selected_item)) = &gui_state.selected_item {
             let mut container = widgets::ColoredBox::container(Color::rgba(0, 0, 0, 200));
             container.min_size.x = 200.;
-            container.show_children(|| {
-                match selected_item {
-                    common::SelectedItemInfo::Human(h) => human_info(h),
-                }
+            container.show_children(|| match selected_item {
+                common::SelectedItemInfo::Human(h) => human(*entity, h, commands),
+                common::SelectedItemInfo::PlaceOfWork(p) => place_of_work(*entity, p, commands),
+                common::SelectedItemInfo::Storage(s) => storage(s),
             });
         }
     });
     gui.yak.finish();
 }
 
-fn human_info(h: &HumanInfo) {
-    let HumanInfo { name, state } = &h;
+fn storage(s: &common::StorageInfo) {
+    let stock = &s.stock;
+    column(|| {
+        text(30., "Storage");
+        text(20., format!("Stock: {stock:?}"));
+    });
+}
+
+fn human(entity: hecs::Entity, h: &HumanInfo, commands: &mut VecDeque<GUICommand>) {
+    let HumanInfo {
+        name,
+        state,
+        place_of_work,
+        inventory,
+    } = &h;
     column(|| {
         text(30., "Worker");
         text(20., format!("Name: {name}"));
         text(20., format!("State: {state}"));
+        text(20., format!("Place of work: {place_of_work}"));
+        text(20., format!("Inventory: {inventory}"));
         let res = button("Liquify");
         if res.clicked {
-            println!("You liquified {name}!");
+            commands.push_back(GUICommand::Liquify(entity))
         }
     });
+}
+
+fn place_of_work(entity: hecs::Entity, p: &PlaceOfWorkInfo, commands: &mut VecDeque<GUICommand>) {
+    let PlaceOfWorkInfo {
+        name,
+        task,
+        workers,
+        max_workers,
+        stock,
+    } = p;
+    column(|| {
+        text(30., name.clone());
+        text(20., get_description(name));
+        text(20., format!("Task: {task}"));
+        text(20., format!("Workers: {workers}/{max_workers}"));
+        text(20., format!("Stock: {stock}"));
+        if workers < max_workers {
+            let add_workers = button("Add workers");
+            if add_workers.clicked {
+                commands.push_back(GUICommand::SetWorkerCount(entity, workers + 1))
+            }
+        }
+        if *workers > 0 {
+            let remove_workers = button("Remove workers");
+            if remove_workers.clicked {
+                commands.push_back(GUICommand::SetWorkerCount(entity, workers - 1))
+            }
+        }
+    });
+}
+
+fn get_description(name: &str) -> &'static str {
+    match name {
+        "Mine" => "A place where raw iron can be mined. By mining.",
+        "Forge" => "A place where raw iron can be smelted into.. less.. raw iron.",
+        "Factory" => "A place where pure iron can be made into PAPERCLIPS!",
+        _ => "Honestly I've got no idea",
+    }
 }
