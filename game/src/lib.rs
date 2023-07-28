@@ -11,7 +11,7 @@ use common::{
     hecs, rand,
     rapier3d::prelude::Ray,
     winit::{self},
-    Camera, GUIState, Geometry, Line, Material,
+    Camera, GUIState, Geometry, HumanInfo, Line, Material, SelectedItemInfo,
 };
 use components::{Dave, Human, HumanState, Selected, Transform, Velocity};
 use std::f32::consts::TAU;
@@ -312,11 +312,20 @@ fn update_gui_state(game: &mut Game, gui_state: &mut GUIState) {
         .filter(|(_, h)| h.state == HumanState::Working)
         .count();
 
-    gui_state.selected_worker = game
+    if let Some((_, human)) = game
         .world
-        .query_mut::<&Info>()
-        .with::<(&Human, &Selected)>()
+        .query_mut::<&Human>()
+        .with::<&Selected>()
         .into_iter()
         .next()
-        .map(|(_, i)| i.name.clone());
+    {
+        gui_state.selected_item = Some(SelectedItemInfo::Human(HumanInfo {
+            name: "Boris".into(),
+            state: format!("{:?}", human.state),
+        }));
+        return;
+    }
+
+    // nothing was selected!
+    gui_state.selected_item = None;
 }

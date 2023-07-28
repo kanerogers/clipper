@@ -1,8 +1,10 @@
-use common::yakui;
 pub use common::GUIState;
+use common::{
+    yakui::{self, button},
+    HumanInfo,
+};
 pub use yakui::geometry::Rect;
-use yakui::MainAxisSize;
-
+use yakui::{MainAxisSize, colored_box_container, column, expanded, row, text, widgets, Color};
 pub struct GUI {
     pub yak: yakui::Yakui,
     pub state: GUIState,
@@ -33,23 +35,44 @@ impl GUI {
 }
 
 #[no_mangle]
-pub fn draw_gui(gui_state: &GUIState, gui: &mut GUI) {
+pub fn draw_gui(gui: &mut GUI) {
+    let gui_state = &gui.state;
     gui.yak.start();
-    use yakui::{colored_box_container, row, text, widgets::List, Color};
     let paperclip_count = gui_state.paperclips;
     let worker_count = gui_state.workers;
-    let no_worker = "none".into();
-    let selected_worker = gui_state.selected_worker.as_ref().unwrap_or(&no_worker);
     row(|| {
         colored_box_container(Color::rgba(0, 0, 0, 200), || {
-            let mut col = List::column();
+            let mut col = widgets::List::column();
             col.main_axis_size = MainAxisSize::Min;
             col.show(|| {
-                text(40., format!("Workers: {worker_count}"));
-                text(40., format!("Paperclips: {paperclip_count}"));
-                text(20., format!("Comrade worker: {selected_worker}"));
+                text(30., format!("Workers: {worker_count}"));
+                text(30., format!("Paperclips: {paperclip_count}"));
             });
         });
+        expanded(|| {});
+
+        if let Some(selected_item) = &gui_state.selected_item {
+            let mut container = widgets::ColoredBox::container(Color::rgba(0, 0, 0, 200));
+            container.min_size.x = 200.;
+            container.show_children(|| {
+                match selected_item {
+                    common::SelectedItemInfo::Human(h) => human_info(h),
+                }
+            });
+        }
     });
     gui.yak.finish();
+}
+
+fn human_info(h: &HumanInfo) {
+    let HumanInfo { name, state } = &h;
+    column(|| {
+        text(30., "Worker");
+        text(20., format!("Name: {name}"));
+        text(20., format!("State: {state}"));
+        let res = button("Liquify");
+        if res.clicked {
+            println!("You liquified {name}!");
+        }
+    });
 }

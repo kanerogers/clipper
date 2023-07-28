@@ -126,7 +126,18 @@ impl Camera {
 pub struct GUIState {
     pub paperclips: usize,
     pub workers: usize,
-    pub selected_worker: Option<String>,
+    pub selected_item: Option<SelectedItemInfo>,
+}
+
+#[derive(Debug, Clone)]
+pub enum SelectedItemInfo {
+    Human(HumanInfo),
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct HumanInfo {
+    pub name: String,
+    pub state: String,
 }
 
 pub trait Renderer {

@@ -27,13 +27,20 @@ mod hot_game {
 mod hot_gui {
     hot_functions_from_file!("gui/src/lib.rs");
 
+    pub use common::GUIState;
     pub use gui::GUI;
 }
 
-const INITIAL_SCREEN_WIDTH: u32 = 800;
-const INITIAL_SCREEN_HEIGHT: u32 = 600;
+const INITIAL_SCREEN_WIDTH: u32 = 1000;
+const INITIAL_SCREEN_HEIGHT: u32 = 1000;
 
-pub fn init<R: Renderer>() -> (R, EventLoop<()>, hot_gui::GUI, hot_game::Game) {
+pub fn init<R: Renderer>() -> (
+    R,
+    EventLoop<()>,
+    hot_gui::GUI,
+    hot_game::Game,
+    yakui_winit::YakuiWinit,
+) {
     env_logger::init();
     log::debug!("Debug logging enabled");
     let event_loop = winit::event_loop::EventLoop::new();
@@ -46,11 +53,12 @@ pub fn init<R: Renderer>() -> (R, EventLoop<()>, hot_gui::GUI, hot_game::Game) {
         .unwrap();
     let mut game = hot_game::init();
     game.resized(window.inner_size());
+    let yak_winit = yakui_winit::YakuiWinit::new(&window);
 
     let renderer = R::init(window);
     let gui = hot_gui::GUI::new(INITIAL_SCREEN_WIDTH, INITIAL_SCREEN_HEIGHT);
 
-    (renderer, event_loop, gui, game)
+    (renderer, event_loop, gui, game, yak_winit)
 }
 
 #[cfg(target_os = "macos")]
@@ -61,12 +69,13 @@ type RendererImpl = LazyVulkan;
 
 fn main() {
     println!("Starting clipper!");
-    let (mut renderer, mut event_loop, mut gui, mut game) = init::<RendererImpl>();
+    let (mut renderer, mut event_loop, mut gui, mut game, mut yak_winit) = init::<RendererImpl>();
 
     // Off we go!
     let mut winit_initializing = true;
     event_loop.run_return(|event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
+        let handled_by_yak = yak_winit.handle_event(&mut gui.yak, &event);
         match event {
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
@@ -97,7 +106,11 @@ fn main() {
                     renderer.resized(size);
                 }
             }
-            Event::WindowEvent { event, .. } => hot_game::handle_winit_event(&mut game, event),
+            Event::WindowEvent { event, .. } => {
+                if !handled_by_yak {
+                    hot_game::handle_winit_event(&mut game, event)
+                }
+            }
             _ => (),
         }
     });
@@ -112,7 +125,7 @@ fn window_tick<R: Renderer>(game: &mut hot_game::Game, renderer: &mut R, gui: &m
     };
 
     game.input.camera_zoom = 0.;
-    hot_gui::draw_gui(&game.gui_state, gui);
+    hot_gui::draw_gui(gui);
 
     renderer.render(&meshes, &game.debug_lines, game.camera, &mut gui.yak);
 }
