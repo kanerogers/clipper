@@ -11,7 +11,7 @@ glam = "0.22.0"
 hecs = {version = "0.10.3", default-features = false}
 log = "0.4.19"
 rand = "0.8"
-rapier3d = {version = "0.17.2"}
+rapier3d = {version = "0.17.2", features = ["debug-render"]}
 winit = "0.28.6"
 yakui = {git = "https://github.com/leetvr/yakui", branch = "vulkan_fixes"}
 

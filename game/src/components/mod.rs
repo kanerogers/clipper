@@ -89,3 +89,16 @@ pub enum ResourceType {
     #[default]
     Wood,
 }
+
+#[derive(Debug, Clone, Default)]
+pub struct Info {
+    pub name: String,
+}
+
+impl Info {
+    pub fn new<S: Into<String>>(name: S) -> Self {
+        Self {
+            name: name.into()
+        }
+    }
+}

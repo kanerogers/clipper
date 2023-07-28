@@ -1,3 +1,3 @@
 use crate::Game;
 
-pub fn beacons(game: &mut Game) {}
+pub fn beacons(_game: &mut Game) {}

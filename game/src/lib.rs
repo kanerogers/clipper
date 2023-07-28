@@ -9,19 +9,21 @@ use common::{
     bitflags::bitflags,
     glam::{Quat, Vec2, Vec3},
     hecs, rand,
+    rapier3d::prelude::Ray,
     winit::{self},
-    Camera, GUIState, Geometry, Material,
+    Camera, GUIState, Geometry, Line, Material,
 };
 use components::{Dave, Human, HumanState, Transform, Velocity};
 use std::f32::consts::TAU;
-use systems::{beacons, click_system, dave_controller, humans, physics, PhysicsContext};
+use systems::{beacons, click_system, dave_controller, from_na, humans, physics, PhysicsContext};
 use time::Time;
 
-use crate::beacon::Beacon;
+use crate::{beacon::Beacon, components::Info};
 
 pub const PLAYER_SPEED: f32 = 7.;
 pub const CAMERA_ZOOM_SPEED: f32 = 10.;
 pub const CAMERA_ROTATE_SPEED: f32 = 3.;
+const RENDER_DEBUG_LINES: bool = true;
 
 // required due to reasons
 #[no_mangle]
@@ -32,6 +34,7 @@ pub fn init() -> Game {
 #[no_mangle]
 pub fn tick(game: &mut Game, gui_state: &mut GUIState) -> Vec<Mesh> {
     while game.time.start_update() {
+        game.debug_lines.clear();
         update_camera(game);
         click_system(game);
         dave_controller(game);
@@ -39,6 +42,22 @@ pub fn tick(game: &mut Game, gui_state: &mut GUIState) -> Vec<Mesh> {
         physics(game);
         beacons(game);
         update_gui_state(game, gui_state);
+    }
+
+    if let Some(last_ray) = game.last_ray {
+        let origin = from_na(last_ray.origin);
+        let direction: Vec3 = from_na(last_ray.dir);
+        let end = origin + direction * 100.;
+
+        game.debug_lines.push(Line {
+            start: origin,
+            end,
+            colour: [1., 0., 1.].into(),
+        });
+    }
+
+    if !RENDER_DEBUG_LINES {
+        game.debug_lines.clear();
     }
 
     game.meshes()
@@ -56,6 +75,9 @@ pub struct Game {
     pub input: Input,
     pub camera: Camera,
     pub physics_context: PhysicsContext,
+    pub window_size: winit::dpi::PhysicalSize<u32>,
+    pub debug_lines: Vec<Line>,
+    pub last_ray: Option<Ray>,
 }
 
 impl Default for Game {
@@ -67,6 +89,9 @@ impl Default for Game {
             input: Default::default(),
             camera: Default::default(),
             physics_context: Default::default(),
+            window_size: Default::default(),
+            debug_lines: Default::default(),
+            last_ray: None,
         }
     }
 }
@@ -83,13 +108,14 @@ impl Game {
             Material::from_colour([0., 0., 1.].into()),
             Transform::from_translation([0., 2., 0.].into()),
             Velocity::default(),
+            Info::new("DAVE"),
         ));
 
         // terrain
         world.spawn(get_grid());
 
         const STARTING_HUMANS: usize = 10;
-        for _ in 0..STARTING_HUMANS {
+        for i in 0..STARTING_HUMANS {
             let x = (rand::random::<f32>() * 50.) - 25.;
             let z = (rand::random::<f32>() * 50.) - 25.;
             world.spawn((
@@ -98,6 +124,7 @@ impl Game {
                 Material::from_colour([0., 1., 0.].into()),
                 Transform::from_translation([x, 1., z].into()),
                 Velocity::default(),
+                Info::new(format!("Human {i}")),
             ));
         }
 
@@ -112,6 +139,7 @@ impl Game {
                 [2.0, 20., 2.0].into(),
             ),
             Velocity::default(),
+            Info::new("Beacon"),
         ));
 
         camera.position.y = 3.;
@@ -139,6 +167,11 @@ impl Game {
             })
             .collect()
     }
+
+    pub fn resized(&mut self, window_size: winit::dpi::PhysicalSize<u32>) {
+        self.window_size = window_size;
+        self.camera.resized(window_size);
+    }
 }
 
 bitflags! {
@@ -163,19 +196,35 @@ impl Keys {
     }
 }
 
+#[derive(Clone, Debug, Default)]
+pub struct MouseState {
+    pub position: Option<Vec2>,
+    pub left_click_state: ClickState,
+    pub right_click_state: ClickState,
+    pub middle_click_state: ClickState,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub enum ClickState {
+    #[default]
+    Released,
+    Down,
+    JustReleased,
+}
+
 #[derive(Clone, Debug)]
 pub struct Input {
     pub keyboard_state: Keys,
+    pub mouse_state: MouseState,
     pub camera_zoom: f32,
-    pub click_position: Option<Vec2>,
 }
 
 impl Default for Input {
     fn default() -> Self {
         Self {
+            mouse_state: Default::default(),
             keyboard_state: Default::default(),
             camera_zoom: 0.,
-            click_position: None,
         }
     }
 }
@@ -186,7 +235,7 @@ impl Input {
     }
 }
 
-fn get_grid() -> (Transform, Material, Geometry) {
+fn get_grid() -> (Transform, Material, Geometry, Info) {
     let plane_rotation = Quat::from_rotation_x(TAU / 4.0); // 90 degrees
     let grid_size = 255;
 
@@ -198,6 +247,7 @@ fn get_grid() -> (Transform, Material, Geometry) {
         },
         Material::from_colour(rgb_to_vec(11, 102, 35)),
         Geometry::Plane,
+        Info::new("Ground"),
     )
 }
 

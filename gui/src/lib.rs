@@ -42,6 +42,8 @@ fn draw_gui(gui_state: &GUIState) {
     use yakui::{colored_box_container, row, text, widgets::List, Color};
     let paperclip_count = gui_state.paperclips;
     let worker_count = gui_state.workers;
+    let no_worker = "none".into();
+    let selected_worker = gui_state.selected_worker.as_ref().unwrap_or(&no_worker);
     row(|| {
         colored_box_container(Color::rgba(0, 0, 0, 200), || {
             let mut col = List::column();
@@ -49,6 +51,7 @@ fn draw_gui(gui_state: &GUIState) {
             col.show(|| {
                 text(40., format!("Workers: {worker_count}"));
                 text(40., format!("Paperclips: {paperclip_count}"));
+                text(20., format!("Selected worker: {selected_worker}"));
             });
         });
     });

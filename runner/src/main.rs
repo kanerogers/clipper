@@ -24,22 +24,27 @@ mod hot_game {
     pub use game::{Game, Keys, Mesh};
 }
 
-pub fn init<R: Renderer>() -> (R, EventLoop<()>, GUI) {
+const INITIAL_SCREEN_WIDTH: u32 = 800;
+const INITIAL_SCREEN_HEIGHT: u32 = 600;
+
+pub fn init<R: Renderer>() -> (R, EventLoop<()>, GUI, hot_game::Game) {
     env_logger::init();
     log::debug!("Debug logging enabled");
     let event_loop = winit::event_loop::EventLoop::new();
-    let size = winit::dpi::LogicalSize::new(800, 600);
+    let size = winit::dpi::LogicalSize::new(INITIAL_SCREEN_WIDTH, INITIAL_SCREEN_HEIGHT);
 
     let window = winit::window::WindowBuilder::new()
         .with_inner_size(size)
         .with_title("Clipper".to_string())
         .build(&event_loop)
         .unwrap();
+    let mut game = hot_game::init();
+    game.resized(window.inner_size());
 
     let renderer = R::init(window);
-    let gui = GUI::new(800, 600);
+    let gui = GUI::new(INITIAL_SCREEN_WIDTH, INITIAL_SCREEN_HEIGHT);
 
-    (renderer, event_loop, gui)
+    (renderer, event_loop, gui, game)
 }
 
 #[cfg(target_os = "macos")]
@@ -50,8 +55,7 @@ type RendererImpl = LazyVulkan;
 
 fn main() {
     println!("Starting clipper!");
-    let (mut renderer, mut event_loop, mut gui) = init::<RendererImpl>();
-    let mut game = hot_game::init();
+    let (mut renderer, mut event_loop, mut gui, mut game) = init::<RendererImpl>();
 
     // Off we go!
     let mut winit_initializing = true;
@@ -82,6 +86,7 @@ fn main() {
                 if winit_initializing {
                     return;
                 } else {
+                    game.window_size = size;
                     gui.resized(size.width, size.height);
                     renderer.resized(size);
                 }
@@ -103,5 +108,5 @@ fn window_tick<R: Renderer>(game: &mut hot_game::Game, renderer: &mut R, gui: &m
     game.input.camera_zoom = 0.;
 
     gui.update();
-    renderer.render(&meshes, game.camera, &mut gui.yak);
+    renderer.render(&meshes, &game.debug_lines, game.camera, &mut gui.yak);
 }

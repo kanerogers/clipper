@@ -29,6 +29,12 @@ impl Vertex {
     }
 }
 
+#[derive(Default, Debug, Clone, Copy)]
+pub struct LineVertex {
+    pub position: Vec4,
+    pub colour: Vec4,
+}
+
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct SwapchainInfo {
@@ -83,23 +89,38 @@ impl Renderer for LazyVulkan {
         Self::new(window)
     }
 
-    fn render(&mut self, meshes: &[common::Mesh], camera: Camera, yak: &mut yakui::Yakui) {
+    fn render(
+        &mut self,
+        meshes: &[common::Mesh],
+        lines: &[common::Line],
+        camera: Camera,
+        yak: &mut yakui::Yakui,
+    ) {
         let swapchain_index = self.render_begin();
         self.renderer.camera = camera;
-        let context = self.context();
-        self.renderer._render(context, swapchain_index, meshes);
+        let context = &self.context;
+        let mut line_vertices = Vec::new();
+        for line in lines {
+            line_vertices.push(LineVertex {
+                position: line.start.extend(1.),
+                colour: line.colour.extend(1.),
+            });
+            line_vertices.push(LineVertex {
+                position: line.end.extend(1.),
+                colour: line.colour.extend(1.),
+            })
+        }
+        unsafe {
+            self.renderer
+                .line_vertex_buffer
+                .overwrite(context, &line_vertices)
+        };
 
-        // blergh
-        let yakui_vulkan_context = &yakui_vulkan::VulkanContext::new(
-            &self.context.device,
-            context.queue,
-            context.draw_command_buffer,
-            context.command_pool,
-            context.memory_properties,
-        );
+        self.renderer
+            ._render(context, swapchain_index, meshes, &line_vertices);
 
         self.yakui_vulkan
-            .paint(yak, &yakui_vulkan_context, swapchain_index);
+            .paint(yak, &context.into(), swapchain_index);
         self.render_end(swapchain_index, &[self.present_complete_semaphore]);
     }
 

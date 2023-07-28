@@ -1,3 +1,5 @@
+use crate::ClickState;
+
 use super::{Game, Keys};
 use common::winit::{
     self,
@@ -14,6 +16,12 @@ pub fn handle_winit_event(game: &mut Game, event: winit::event::WindowEvent) {
         }
         WindowEvent::MouseWheel { delta, .. } => {
             handle_mousewheel(game, delta);
+        }
+        WindowEvent::CursorLeft { .. } => {
+            game.input.mouse_state.position = None;
+        }
+        WindowEvent::CursorMoved { position, .. } => {
+            game.input.mouse_state.position = Some([position.x as f32, position.y as f32].into())
         }
         _ => {}
     }
@@ -91,4 +99,34 @@ fn handle_keypress(game: &mut Game, keyboard_input: winit::event::KeyboardInput)
     }
 }
 
-fn handle_mouse_click(game: &mut Game, state: ElementState, button: winit::event::MouseButton) {}
+fn handle_mouse_click(game: &mut Game, state: ElementState, button: winit::event::MouseButton) {
+    let mouse_input_state = &mut game.input.mouse_state;
+    let left = &mut mouse_input_state.left_click_state;
+    let right = &mut mouse_input_state.right_click_state;
+    let middle = &mut mouse_input_state.middle_click_state;
+
+    match (state, button) {
+        (ElementState::Pressed, winit::event::MouseButton::Left) => {
+            *left = ClickState::Down;
+        }
+        (ElementState::Pressed, winit::event::MouseButton::Right) => {
+            *right = ClickState::Down;
+        }
+        (ElementState::Pressed, winit::event::MouseButton::Middle) => {
+            *middle = ClickState::Down;
+        }
+        (ElementState::Released, winit::event::MouseButton::Left) => match left {
+            ClickState::Down => *left = ClickState::JustReleased,
+            _ => *left = ClickState::Released,
+        },
+        (ElementState::Released, winit::event::MouseButton::Right) => match right {
+            ClickState::Down => *right = ClickState::JustReleased,
+            _ => *right = ClickState::Released,
+        },
+        (ElementState::Released, winit::event::MouseButton::Middle) => match middle {
+            ClickState::Down => *middle = ClickState::JustReleased,
+            _ => *middle = ClickState::Released,
+        },
+        _ => {}
+    }
+}

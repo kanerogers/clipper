@@ -69,6 +69,8 @@ pub struct Camera {
     pub target: glam::Vec3,
     pub desired_distance: f32,
     pub start_distance: f32,
+    pub projection: glam::Mat4,
+    pub screen_size: glam::Vec2,
 }
 
 impl Camera {
@@ -80,17 +82,68 @@ impl Camera {
         let rotation = glam::Quat::from_euler(glam::EulerRot::YXZ, self.yaw, self.pitch, 0.);
         glam::Affine3A::from_rotation_translation(rotation, self.position)
     }
+
+    pub fn resized(&mut self, window_size: winit::dpi::PhysicalSize<u32>) {
+        let aspect_ratio = window_size.width as f32 / window_size.height as f32;
+        let mut perspective =
+            glam::Mat4::perspective_rh(60_f32.to_radians(), aspect_ratio, 0.01, 1000.);
+        perspective.y_axis[1] *= -1.;
+        self.projection = perspective;
+        self.screen_size = [window_size.width as f32, window_size.height as f32].into();
+    }
+
+    pub fn create_ray(&self, click_in_screen: glam::Vec2) -> rapier3d::geometry::Ray {
+        // Normalize the click position to NDC
+        let ndc_x = (click_in_screen.x / self.screen_size.x - 0.5) * 2.0;
+        let ndc_y = (click_in_screen.y / self.screen_size.y - 0.5) * 2.0;
+        let click_in_clip = glam::Vec4::new(ndc_x, ndc_y, -1., 1.0);
+
+        // Unproject the clip space coordinates to NDC space
+        let view_from_clip = self.projection.inverse();
+        let view_in_ndc = view_from_clip * click_in_clip;
+
+        // Normalize the view space coordinates
+        let direction_in_view = glam::Vec3::new(
+            view_in_ndc.x / view_in_ndc.w,
+            view_in_ndc.y / view_in_ndc.w,
+            view_in_ndc.z / view_in_ndc.w,
+        );
+
+        // Transform the view space direction to world space
+        let ray_in_world = self
+            .transform()
+            .transform_vector3(direction_in_view)
+            .normalize();
+        // Create the ray
+        rapier3d::geometry::Ray::new(
+            self.position.to_array().into(),
+            ray_in_world.to_array().into(),
+        )
+    }
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct GUIState {
     pub paperclips: usize,
     pub workers: usize,
+    pub selected_worker: Option<String>,
 }
 
 pub trait Renderer {
     fn init(window: winit::window::Window) -> Self;
-    fn render(&mut self, meshes: &[Mesh], camera: Camera, yak: &mut yakui::Yakui);
+    fn render(&mut self, meshes: &[Mesh], lines: &[Line], camera: Camera, yak: &mut yakui::Yakui);
     fn resized(&mut self, size: winit::dpi::PhysicalSize<u32>);
     fn cleanup(&mut self);
+}
+
+pub struct Line {
+    pub start: glam::Vec3,
+    pub end: glam::Vec3,
+    pub colour: glam::Vec3,
+}
+
+impl Line {
+    pub fn new(start: glam::Vec3, end: glam::Vec3, colour: glam::Vec3) -> Self {
+        Self { start, end, colour }
+    }
 }
