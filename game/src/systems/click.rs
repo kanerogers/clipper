@@ -1,8 +1,6 @@
-use crate::{
-    components::{Info, Selected},
-    ClickState, Game,
-};
+use crate::{ClickState, Game};
 use common::hecs;
+use components::{Info, Selected};
 
 pub fn click_system(game: &mut Game) {
     let mouse_state = &mut game.input.mouse_state;

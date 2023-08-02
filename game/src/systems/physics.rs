@@ -1,8 +1,8 @@
 use common::rapier3d::{na, prelude::*};
-use common::{glam, hecs, Geometry, Line};
+use common::{glam, hecs, Line};
 
-use crate::components::{Info, Transform};
 use crate::Game;
+use components::{Info, Transform};
 
 pub struct PhysicsContext {
     rigid_body_set: RigidBodySet,
@@ -138,35 +138,35 @@ fn update_colliders(game: &mut Game) {
 fn create_missing_collider_handles(game: &mut Game) {
     let mut command_buffer = hecs::CommandBuffer::new();
 
-    for (entity, (geometry, transform, info)) in game
+    for (_entity, (transform, info)) in game
         .world
-        .query::<(&Geometry, &Transform, &Info)>()
+        .query::<(&Transform, &Info)>()
         .without::<&ColliderHandle>()
         .iter()
     {
         if info.name == "Ground" {
             continue;
         }
-        let scale = transform.scale;
-        let shape = match geometry {
-            Geometry::Plane => SharedShape::cuboid(scale.x, scale.y, 0.0),
-            Geometry::Sphere => SharedShape::ball(scale.x),
-            Geometry::Cube => SharedShape::cuboid(scale.x, scale.y, scale.z),
-        };
+        let _scale = transform.scale;
+        // let shape = match geometry {
+        //     Geometry::Plane => SharedShape::cuboid(scale.x, scale.y, 0.0),
+        //     Geometry::Sphere => SharedShape::ball(scale.x),
+        //     Geometry::Cube => SharedShape::cuboid(scale.x, scale.y, scale.z),
+        // };
 
-        let collider = ColliderBuilder::new(shape)
-            .position(transform.into())
-            .user_data(entity.to_bits().get() as _)
-            .active_collision_types(ActiveCollisionTypes::all())
-            .sensor(true);
+        // let collider = ColliderBuilder::new(shape)
+        //     .position(transform.into())
+        //     .user_data(entity.to_bits().get() as _)
+        //     .active_collision_types(ActiveCollisionTypes::all())
+        //     .sensor(true);
         // println!(
         //     "Created collider for {} - {:?}",
         //     info.name, collider.position
         // );
 
-        let handle = game.physics_context.collider_set.insert(collider.build());
+        // let handle = game.physics_context.collider_set.insert(collider.build());
 
-        command_buffer.insert_one(entity, handle);
+        // command_buffer.insert_one(entity, handle);
     }
     // println!("..done!");
 

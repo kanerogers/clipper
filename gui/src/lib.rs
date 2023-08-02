@@ -3,7 +3,7 @@ use std::collections::VecDeque;
 pub use common::GUIState;
 use common::{
     hecs,
-    yakui::{self, button, widgets::ListWidget},
+    yakui::{self, button},
     GUICommand, HumanInfo, PlaceOfWorkInfo,
 };
 pub use yakui::geometry::Rect;

@@ -5,7 +5,7 @@ use common::{
     rand, hecs::{self},
 };
 
-use crate::beacon::Beacon;
+use crate::Beacon;
 
 use super::{Transform, PlaceOfWork, Inventory, ResourceDestination, Storage, Task, Resource};
 

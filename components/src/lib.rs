@@ -4,12 +4,25 @@ use std::{
 };
 
 use common::{
-    glam::{Affine3A, Quat, Vec3},
+    glam::{Affine3A, Mat4, Quat, Vec3},
     hecs,
     rapier3d::na,
 };
+mod beacon;
 mod human;
+pub use beacon::Beacon;
 pub use human::{Human, State as HumanState};
+
+#[derive(Debug, Clone)]
+pub struct GLTFAsset {
+    pub name: String,
+}
+
+impl GLTFAsset {
+    pub fn new<S: Into<String>>(name: S) -> Self {
+        Self { name: name.into() }
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct Transform {
@@ -56,6 +69,12 @@ impl Transform {
 impl From<&Transform> for Affine3A {
     fn from(value: &Transform) -> Self {
         Affine3A::from_scale_rotation_translation(value.scale, value.rotation, value.position)
+    }
+}
+
+impl From<&Transform> for Mat4 {
+    fn from(value: &Transform) -> Self {
+        Mat4::from_scale_rotation_translation(value.scale, value.rotation, value.position)
     }
 }
 
