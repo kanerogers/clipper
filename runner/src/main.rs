@@ -20,7 +20,7 @@ mod hot_game {
     hot_functions_from_file!("game/src/lib.rs");
 
     use common::{winit, GUIState};
-    pub use game::{Game, Keys, Mesh};
+    pub use game::{Game, Keys};
 }
 
 #[hot_lib_reloader::hot_module(dylib = "gui", file_watch_debounce = 20, lib_dir = "target/debug")]
@@ -70,6 +70,7 @@ type RendererImpl = LazyVulkan;
 fn main() {
     println!("Starting clipper!");
     let (mut renderer, mut event_loop, mut gui, mut game, mut yak_winit) = init::<RendererImpl>();
+    let mut asset_loader = asset_loader::AssetLoader::new();
 
     // Off we go!
     let mut winit_initializing = true;
@@ -92,7 +93,7 @@ fn main() {
             }
 
             Event::MainEventsCleared => {
-                window_tick(&mut game, &mut renderer, &mut gui);
+                window_tick(&mut game, &mut renderer, &mut gui, &mut asset_loader);
             }
             Event::WindowEvent {
                 event: WindowEvent::Resized(size),
@@ -118,14 +119,18 @@ fn main() {
     renderer.cleanup();
 }
 
-fn window_tick<R: Renderer>(game: &mut hot_game::Game, renderer: &mut R, gui: &mut hot_gui::GUI) {
-    let meshes = {
-        game.time.start_frame();
-        hot_game::tick(game, &mut gui.state)
-    };
-
+fn window_tick<R: Renderer>(
+    game: &mut hot_game::Game,
+    renderer: &mut R,
+    gui: &mut hot_gui::GUI,
+    asset_loader: &mut asset_loader::AssetLoader,
+) {
+    game.time.start_frame();
+    hot_game::tick(game, &mut gui.state);
+    asset_loader.load_assets(&mut game.world);
     game.input.camera_zoom = 0.;
     hot_gui::draw_gui(gui);
 
-    renderer.render(&meshes, &game.debug_lines, game.camera, &mut gui.yak);
+    renderer.update_assets(&mut game.world);
+    renderer.render(&game.world, &game.debug_lines, game.camera, &mut gui.yak);
 }

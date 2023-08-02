@@ -1,5 +1,6 @@
 use std::collections::VecDeque;
 
+pub use anyhow;
 pub use bitflags;
 pub use glam;
 pub use hecs;
@@ -7,57 +8,30 @@ use hecs::Entity;
 pub use log;
 pub use rand;
 pub use rapier3d;
+pub use thunderdome;
 pub use winit;
 pub use yakui;
 
-use glam::Vec3;
-
 #[derive(Clone, Debug, Copy)]
-pub struct Mesh {
-    pub geometry: Geometry,
-    pub texture_id: u32,
-    pub transform: glam::Affine3A,
-    pub colour: Option<Vec3>,
+pub struct GeometryOffsets {
+    pub index_offset: u32,
+    pub index_count: u32,
+    pub vertex_offset: u32,
+    pub vertex_count: u32,
 }
 
-impl Default for Mesh {
-    fn default() -> Self {
+impl GeometryOffsets {
+    pub fn new(
+        index_offset: usize,
+        index_count: usize,
+        vertex_offset: usize,
+        vertex_count: usize,
+    ) -> Self {
         Self {
-            geometry: Geometry::Plane,
-            texture_id: u32::MAX,
-            transform: Default::default(),
-            colour: Default::default(),
-        }
-    }
-}
-
-#[derive(Clone, Debug, Copy)]
-pub enum Geometry {
-    Plane,
-    Sphere,
-    Cube,
-}
-
-#[derive(Clone, Debug, Copy)]
-pub struct Material {
-    pub colour: glam::Vec3,
-    pub texture_id: u32,
-}
-
-impl Material {
-    pub fn from_colour(colour: glam::Vec3) -> Self {
-        Self {
-            colour,
-            ..Default::default()
-        }
-    }
-}
-
-impl Default for Material {
-    fn default() -> Self {
-        Self {
-            colour: Vec3::ONE,
-            texture_id: u32::MAX,
+            index_offset: index_offset as _,
+            index_count: index_count as _,
+            vertex_offset: vertex_offset as _,
+            vertex_count: vertex_count as _,
         }
     }
 }
@@ -164,7 +138,14 @@ pub struct StorageInfo {
 
 pub trait Renderer {
     fn init(window: winit::window::Window) -> Self;
-    fn render(&mut self, meshes: &[Mesh], lines: &[Line], camera: Camera, yak: &mut yakui::Yakui);
+    fn update_assets(&mut self, world: &mut hecs::World);
+    fn render(
+        &mut self,
+        world: &hecs::World,
+        lines: &[Line],
+        camera: Camera,
+        yak: &mut yakui::Yakui,
+    );
     fn resized(&mut self, size: winit::dpi::PhysicalSize<u32>);
     fn cleanup(&mut self);
 }

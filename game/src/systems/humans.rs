@@ -1,9 +1,5 @@
-use common::Material;
-
-use crate::{
-    components::{Human, Transform, Velocity},
-    Game,
-};
+use crate::Game;
+use components::{Human, Transform, Velocity};
 
 pub fn update_human_position(game: &mut Game) {
     let world = &game.world;
@@ -27,10 +23,10 @@ pub fn update_human_position(game: &mut Game) {
 }
 
 pub fn update_human_colour(game: &mut Game) {
-    let world = &game.world;
-    for (_, (human, material)) in world.query::<(&mut Human, &mut Material)>().iter() {
-        material.colour = human.state.get_colour();
-    }
+    let _world = &game.world;
+    // for (_, (human, material)) in world.query::<(&mut Human, &mut Material)>().iter() {
+    //     material.colour = human.state.get_colour();
+    // }
 }
 
 pub fn update_human_state(game: &mut Game) {

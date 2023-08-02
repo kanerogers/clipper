@@ -1,30 +1,26 @@
-pub mod beacon;
-pub mod components;
 mod input;
 mod systems;
 pub mod time;
 
-pub use common::Mesh;
 use common::{
     bitflags::bitflags,
     glam::{Quat, Vec2, Vec3},
     hecs, rand,
     rapier3d::prelude::Ray,
     winit::{self},
-    Camera, GUIState, Geometry, HumanInfo, Line, Material, PlaceOfWorkInfo, SelectedItemInfo,
+    Camera, GUIState, HumanInfo, Line, PlaceOfWorkInfo, SelectedItemInfo,
 };
-use components::{Dave, Human, HumanState, Inventory, Selected, Transform, Velocity};
+
+use components::{
+    Beacon, Dave, GLTFAsset, Human, HumanState, Info, Inventory, PlaceOfWork, Resource, Selected,
+    Storage, Transform, Velocity,
+};
 use std::{collections::VecDeque, f32::consts::TAU};
 use systems::{
     beacons, click_system, dave_controller, from_na, physics, update_human_colour,
     update_human_position, update_human_state, PhysicsContext,
 };
 use time::Time;
-
-use crate::{
-    beacon::Beacon,
-    components::{Info, PlaceOfWork, Resource, Storage},
-};
 
 pub const PLAYER_SPEED: f32 = 7.;
 pub const CAMERA_ZOOM_SPEED: f32 = 10.;
@@ -38,7 +34,7 @@ pub fn init() -> Game {
 }
 
 #[no_mangle]
-pub fn tick(game: &mut Game, gui_state: &mut GUIState) -> Vec<Mesh> {
+pub fn tick(game: &mut Game, gui_state: &mut GUIState) {
     while game.time.start_update() {
         game.debug_lines.clear();
         process_gui_command_queue(game, &mut gui_state.command_queue);
@@ -68,8 +64,6 @@ pub fn tick(game: &mut Game, gui_state: &mut GUIState) -> Vec<Mesh> {
     if !RENDER_DEBUG_LINES {
         game.debug_lines.clear();
     }
-
-    game.meshes()
 }
 
 fn process_gui_command_queue(game: &mut Game, command_queue: &mut VecDeque<common::GUICommand>) {
@@ -152,8 +146,6 @@ impl Game {
         // dave
         let dave = world.spawn((
             Dave::default(),
-            Geometry::Sphere,
-            Material::from_colour([0., 0., 1.].into()),
             Transform::from_translation([0., 2., 0.].into()),
             Velocity::default(),
             Info::new("DAVE"),
@@ -167,9 +159,8 @@ impl Game {
             let x = (rand::random::<f32>() * 50.) - 25.;
             let z = (rand::random::<f32>() * 50.) - 25.;
             world.spawn((
+                GLTFAsset::new("viking_1.glb"),
                 Human::default(),
-                Geometry::Cube,
-                Material::from_colour([0., 1., 0.].into()),
                 Transform::from_translation([x, 1., z].into()),
                 Velocity::default(),
                 Info::new(format!("Human {i}")),
@@ -179,8 +170,6 @@ impl Game {
         // beacon
         world.spawn((
             Beacon::default(),
-            Geometry::Cube,
-            Material::from_colour([0., 0., 0.].into()),
             Transform::new(
                 [0.0, 0.0, 0.0].into(),
                 Default::default(),
@@ -192,8 +181,6 @@ impl Game {
 
         // mine
         world.spawn((
-            Geometry::Cube,
-            Material::from_colour([0.2, 0.2, 0.2].into()),
             Transform::new(
                 [20.0, 0.0, 0.0].into(),
                 Default::default(),
@@ -207,8 +194,6 @@ impl Game {
 
         // forge
         world.spawn((
-            Geometry::Cube,
-            Material::from_colour([0.2, 1.0, 0.2].into()),
             Transform::new(
                 [-20., 0.0, 0.0].into(),
                 Default::default(),
@@ -222,8 +207,6 @@ impl Game {
 
         // factory
         world.spawn((
-            Geometry::Cube,
-            Material::from_colour([1.0, 105.0 / 255.0, 180.0 / 255.0].into()),
             Transform::new(
                 [20., 0.0, 30.0].into(),
                 Default::default(),
@@ -237,8 +220,6 @@ impl Game {
 
         // storage
         world.spawn((
-            Geometry::Cube,
-            Material::from_colour([1.0, 0.8, 0.].into()),
             Transform::new(
                 [-20., 0.0, -30.0].into(),
                 Default::default(),
@@ -261,19 +242,6 @@ impl Game {
             world,
             ..Default::default()
         }
-    }
-
-    pub fn meshes(&self) -> Vec<Mesh> {
-        self.world
-            .query::<(&Geometry, &Transform, &Material)>()
-            .into_iter()
-            .map(|(_, (geometry, transform, material))| Mesh {
-                geometry: *geometry,
-                texture_id: material.texture_id,
-                transform: transform.into(),
-                colour: Some(material.colour),
-            })
-            .collect()
     }
 
     pub fn resized(&mut self, window_size: winit::dpi::PhysicalSize<u32>) {
@@ -343,7 +311,7 @@ impl Input {
     }
 }
 
-fn get_grid() -> (Transform, Material, Geometry, Info) {
+fn get_grid() -> (Transform, Info) {
     let plane_rotation = Quat::from_rotation_x(TAU / 4.0); // 90 degrees
     let grid_size = 255;
 
@@ -353,14 +321,8 @@ fn get_grid() -> (Transform, Material, Geometry, Info) {
             rotation: plane_rotation,
             ..Default::default()
         },
-        Material::from_colour(rgb_to_vec(11, 102, 35)),
-        Geometry::Plane,
         Info::new("Ground"),
     )
-}
-
-fn rgb_to_vec(r: usize, g: usize, b: usize) -> Vec3 {
-    [r as f32 / 255., g as f32 / 255., b as f32 / 255.].into()
 }
 
 pub fn update_camera(game: &mut Game) {

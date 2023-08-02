@@ -5,7 +5,7 @@ use ash::{util::Align, vk};
 use crate::{find_memorytype_index, vulkan_context::VulkanContext};
 
 /// Minimum size of a buffer to avoid needless allocations.
-const MIN_BUFFER_SIZE: vk::DeviceSize = 1_048_576; // 1MB
+const MIN_BUFFER_SIZE: vk::DeviceSize = 1_048_576 * 10; // 10MB
 
 /// A wrapper around a host mapped buffer on the GPU
 ///
@@ -73,6 +73,15 @@ impl<T: Copy> Buffer<T> {
         }
     }
 
+    /// size of this buffer in units of T
+    pub fn len(&self) -> usize {
+        self.len
+    }
+    /// size of this buffer in .. you guessed it, bytes
+    pub fn size_in_bytes(&self) -> usize {
+        self.len * std::mem::size_of::<T>()
+    }
+
     pub unsafe fn overwrite(&mut self, _vulkan_context: &VulkanContext, new_data: &[T]) {
         let new_data_size = std::mem::size_of_val(new_data);
         if new_data_size > self.size as usize {
@@ -83,6 +92,23 @@ impl<T: Copy> Buffer<T> {
         slice.copy_from_slice(new_data);
 
         self.len = new_data.len()
+    }
+
+    pub unsafe fn append(&mut self, new_data: &[T]) {
+        let new_data_size = self.size_in_bytes() + std::mem::size_of_val(new_data);
+        if new_data_size > self.size as usize {
+            todo!(
+                "Size {new_data_size} {} - Support resizing buffers",
+                self.size
+            );
+        }
+
+        core::intrinsics::copy_nonoverlapping(
+            new_data.as_ptr(),
+            self.ptr.as_ptr().add(self.len),
+            new_data.len(),
+        );
+        self.len += new_data.len();
     }
 
     /// ## Safety

@@ -1,5 +1,5 @@
 [workspace]
-members = ["vulkan_renderer", "game", "common", "gui", "runner", "metal_renderer"]
+members = ["vulkan_renderer", "game", "common", "gui", "runner", "metal_renderer", "asset_loader", "components"]
 resolver = "2"
 
 [profile.dev.package."*"]

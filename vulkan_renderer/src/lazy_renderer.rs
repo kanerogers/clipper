@@ -3,16 +3,16 @@ use crate::{
     descriptors::Descriptors,
     vulkan_context::VulkanContext,
     vulkan_texture::{VulkanTexture, VulkanTextureCreateInfo},
-    LineVertex, Vertex, NO_TEXTURE_ID,
+    LineVertex, NO_TEXTURE_ID,
 };
-use common::{glam, Camera, Geometry, Mesh};
-use glam::{Vec2, Vec4};
+use asset_loader::{GLTFModel, Material, Vertex};
+use common::{glam, thunderdome, Camera, GeometryOffsets};
+use components::Transform;
+
 use std::ffi::CStr;
 
 use ash::vk;
-use ash::vk::PushConstantRange;
 use bytemuck::{Pod, Zeroable};
-use thunderdome::Index;
 use vk_shader_macros::include_glsl;
 
 const VERTEX_SHADER: &[u32] = include_glsl!("src/shaders/shader.vert");
@@ -37,20 +37,17 @@ pub struct LazyRenderer {
     _line_pipeline_layout: vk::PipelineLayout,
     /// The graphics pipeline used to draw lines. It has a funny name.
     line_pipeline: vk::Pipeline,
-    /// A single index buffer, shared between all draw calls
-    pub index_buffer: Buffer<u32>,
-    /// A single vertex buffer, shared between all draw calls
-    pub vertex_buffer: Buffer<crate::Vertex>,
     /// A single vertex buffer, shared between all draw calls
     pub line_vertex_buffer: Buffer<crate::LineVertex>,
     /// Textures owned by the user
     user_textures: thunderdome::Arena<VulkanTexture>,
+    /// A wrapper around the things you need for geometry
+    geometry_buffers: GeometryBuffers,
     /// A wrapper around descriptor set functionality
     pub descriptors: Descriptors,
     /// You know. A camera.
     pub camera: Camera,
-    /// Some trivial geometry
-    pub geometry_offsets: GeometryOffsets,
+    materials: thunderdome::Arena<GPUMaterial>,
 }
 
 #[derive(Clone)]
@@ -64,6 +61,53 @@ pub struct RenderSurface {
     pub image_views: Vec<vk::ImageView>,
     /// The depth buffers; one per view
     pub depth_buffers: Vec<DepthBuffer>,
+}
+
+struct GeometryBuffers {
+    /// A single index buffer, shared between all draw calls
+    pub index_buffer: Buffer<u32>,
+    /// A single vertex buffer, shared between all draw calls
+    pub vertex_buffer: Buffer<Vertex>,
+    /// Some trivial geometry
+    pub geometry_offsets: thunderdome::Arena<GeometryOffsets>,
+}
+
+impl GeometryBuffers {
+    pub fn new(vulkan_context: &VulkanContext) -> Self {
+        Self {
+            index_buffer: Buffer::new(vulkan_context, vk::BufferUsageFlags::INDEX_BUFFER, &[]),
+            vertex_buffer: Buffer::new(vulkan_context, vk::BufferUsageFlags::VERTEX_BUFFER, &[]),
+            geometry_offsets: Default::default(),
+        }
+    }
+
+    pub fn insert(&mut self, indices: &[u32], vertices: &[Vertex]) -> thunderdome::Index {
+        let index_count = indices.len();
+        let vertex_count = vertices.len();
+        let index_offset = self.index_buffer.len();
+        let vertex_offset = self.vertex_buffer.len();
+
+        unsafe {
+            self.index_buffer.append(indices);
+            self.vertex_buffer.append(vertices);
+        }
+
+        self.geometry_offsets.insert(GeometryOffsets::new(
+            index_offset,
+            index_count,
+            vertex_offset,
+            vertex_count,
+        ))
+    }
+
+    pub fn get<'a>(&'a self, index: thunderdome::Index) -> Option<&'a GeometryOffsets> {
+        self.geometry_offsets.get(index)
+    }
+
+    unsafe fn cleanup(&self, device: &ash::Device) {
+        self.index_buffer.cleanup(device);
+        self.vertex_buffer.cleanup(device);
+    }
 }
 
 impl RenderSurface {
@@ -124,22 +168,43 @@ impl DepthBuffer {
 #[derive(Clone, Copy, Debug)]
 /// Push constants!
 struct PushConstant {
+    material: GPUMaterial,
     mvp: glam::Mat4,
-    colour_factor: glam::Vec3,
-    texture_id: u32,
 }
 
 unsafe impl Zeroable for PushConstant {}
 unsafe impl Pod for PushConstant {}
 
 impl PushConstant {
-    pub fn new(texture_id: u32, mvp: glam::Mat4, colour_factor: Option<glam::Vec3>) -> Self {
-        Self {
-            texture_id,
-            colour_factor: colour_factor.unwrap_or(glam::Vec3::ONE),
-            mvp,
-        }
+    pub fn new(material: GPUMaterial, mvp: glam::Mat4) -> Self {
+        Self { material, mvp }
     }
+}
+
+struct LoadedGLTFModel {
+    primitives: Vec<GPUPrimitive>,
+}
+
+struct GPUPrimitive {
+    pub geometry: thunderdome::Index,
+    pub material: thunderdome::Index,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+struct GPUMaterial {
+    pub emissive_texture_id: u32,
+    pub metallic_roughness_ao_texture_id: u32,
+    pub normal_texture_id: u32,
+    pub base_colour_texture_id: u32,
+    pub base_colour_factor: u32,
+}
+
+#[derive(Debug, Clone)]
+pub struct DrawCall {
+    pub geometry: thunderdome::Index,
+    pub material: thunderdome::Index,
+    pub transform: glam::Mat4,
 }
 
 impl LazyRenderer {
@@ -219,19 +284,8 @@ impl LazyRenderer {
 
         let framebuffers = create_framebuffers(&render_surface, render_pass, device);
 
-        // Populate geometry buffers
-        let (initial_indices, initial_vertices, geometry_offsets) = create_initial_geometry();
+        let geometry_buffers = GeometryBuffers::new(vulkan_context);
 
-        let index_buffer = Buffer::new(
-            vulkan_context,
-            vk::BufferUsageFlags::INDEX_BUFFER,
-            &initial_indices,
-        );
-        let vertex_buffer = Buffer::new(
-            vulkan_context,
-            vk::BufferUsageFlags::VERTEX_BUFFER,
-            &initial_vertices,
-        );
         let line_vertex_buffer =
             Buffer::new(vulkan_context, vk::BufferUsageFlags::VERTEX_BUFFER, &[]);
 
@@ -249,12 +303,11 @@ impl LazyRenderer {
             mesh_pipeline,
             line_pipeline,
             _line_pipeline_layout: line_pipeline_layout,
-            index_buffer,
-            vertex_buffer,
+            geometry_buffers,
             line_vertex_buffer,
             user_textures: Default::default(),
             camera: Default::default(),
-            geometry_offsets,
+            materials: Default::default(),
         }
     }
 
@@ -263,7 +316,7 @@ impl LazyRenderer {
         &self,
         vulkan_context: &VulkanContext,
         framebuffer_index: u32,
-        meshes: &[Mesh],
+        draw_calls: &[DrawCall],
         line_vertices: &[LineVertex],
     ) {
         let device = &vulkan_context.device;
@@ -316,10 +369,15 @@ impl LazyRenderer {
 
             // We set the scissor first here as it's against the spec not to do so.
             device.cmd_set_scissor(command_buffer, 0, &default_scissor);
-            device.cmd_bind_vertex_buffers(command_buffer, 0, &[self.vertex_buffer.handle], &[0]);
+            device.cmd_bind_vertex_buffers(
+                command_buffer,
+                0,
+                &[self.geometry_buffers.vertex_buffer.handle],
+                &[0],
+            );
             device.cmd_bind_index_buffer(
                 command_buffer,
-                self.index_buffer.handle,
+                self.geometry_buffers.index_buffer.handle,
                 0,
                 vk::IndexType::UINT32,
             );
@@ -334,33 +392,31 @@ impl LazyRenderer {
 
             let vp = self.camera.projection * self.camera.matrix();
 
-            for draw_call in meshes {
-                let mvp: glam::Mat4 = vp * draw_call.transform;
+            for draw_call in draw_calls {
+                let mvp = vp * draw_call.transform;
+                let material = self.materials.get(draw_call.material).unwrap();
                 device.cmd_push_constants(
                     command_buffer,
                     self.mesh_pipeline_layout,
                     vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
                     0,
-                    bytemuck::bytes_of(&PushConstant::new(
-                        draw_call.texture_id,
-                        mvp.into(),
-                        draw_call.colour,
-                    )),
+                    bytemuck::bytes_of(&PushConstant::new(*material, mvp)),
                 );
 
-                let IndexBufferEntry {
+                let GeometryOffsets {
                     index_count,
                     index_offset,
                     vertex_offset,
-                } = self.geometry_offsets.get(draw_call.geometry);
+                    ..
+                } = self.geometry_buffers.get(draw_call.geometry).unwrap();
 
                 // Draw the mesh with the indexes we were provided
                 device.cmd_draw_indexed(
                     command_buffer,
-                    index_count,
+                    *index_count,
                     1,
-                    index_offset,
-                    vertex_offset as _,
+                    *index_offset,
+                    *vertex_offset as _,
                     1,
                 );
             }
@@ -378,31 +434,35 @@ impl LazyRenderer {
             );
 
             // most of these attributes are ignored but.. I'm lazy
-            device.cmd_push_constants(
-                command_buffer,
-                self.mesh_pipeline_layout,
-                vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
-                0,
-                bytemuck::bytes_of(&PushConstant::new(NO_TEXTURE_ID, vp, Default::default())),
-            );
+            // TODO
+            // device.cmd_push_constants(
+            //     command_buffer,
+            //     self.mesh_pipeline_layout,
+            //     vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
+            //     0,
+            //     bytemuck::bytes_of(&PushConstant::new(NO_TEXTURE_ID, vp, Default::default())),
+            // );
             device.cmd_draw(command_buffer, (line_vertices.len() * 2) as u32, 1, 0, 1);
             device.cmd_end_render_pass(command_buffer);
         }
     }
 
-    /// Add a "user managed" texture to this [`LazyRenderer`] instance. Returns a [`thunderdome::Index`] that can be used
-    /// to refer to the texture.
+    /// Add a "user managed" texture to this [`LazyRenderer`] instance. Returns a texture ID that can be used
+    /// to refer to the texture in a push constant.
     ///
     /// ## Safety
     /// - `vulkan_context` must be the same as the one used to create this instance
     pub fn add_user_texture(
         &mut self,
         vulkan_context: &VulkanContext,
-        texture_create_info: VulkanTextureCreateInfo<Vec<u8>>,
-    ) -> Index {
+        texture_create_info: VulkanTextureCreateInfo<&[u8]>,
+    ) -> u32 {
         let texture =
             VulkanTexture::new(vulkan_context, &mut self.descriptors, texture_create_info);
-        self.user_textures.insert(texture)
+
+        // TODO: do we even care about doing this, beyond cleanup?
+        // self.user_textures.insert(texture);
+        texture.id
     }
 
     /// Clean up all Vulkan related handles on this instance. You'll probably want to call this when the program ends, but
@@ -422,8 +482,7 @@ impl LazyRenderer {
         device.destroy_pipeline_layout(self.mesh_pipeline_layout, None);
         device.destroy_pipeline(self.mesh_pipeline, None);
         device.destroy_pipeline(self.line_pipeline, None);
-        self.index_buffer.cleanup(device);
-        self.vertex_buffer.cleanup(device);
+        self.geometry_buffers.cleanup(device);
         self.destroy_framebuffers(device);
         device.destroy_render_pass(self.render_pass, None);
     }
@@ -447,6 +506,84 @@ impl LazyRenderer {
         for framebuffer in &self.framebuffers {
             device.destroy_framebuffer(*framebuffer, None);
         }
+    }
+
+    pub fn update_assets(
+        &mut self,
+        vulkan_context: &VulkanContext,
+        world: &mut common::hecs::World,
+    ) {
+        let mut command_buffer = common::hecs::CommandBuffer::new();
+        for (entity, asset) in world
+            .query::<&GLTFModel>()
+            .without::<&LoadedGLTFModel>()
+            .iter()
+        {
+            let mut primitives = Vec::new();
+            for primitive in &asset.primitives {
+                let geometry = self
+                    .geometry_buffers
+                    .insert(&primitive.indices, &primitive.vertices);
+                let material = self.import_material(&primitive.material, vulkan_context);
+                primitives.push(GPUPrimitive { geometry, material });
+            }
+            command_buffer.insert_one(entity, LoadedGLTFModel { primitives });
+        }
+
+        command_buffer.run_on(world);
+    }
+
+    fn import_material(
+        &mut self,
+        material: &Material,
+        vulkan_context: &VulkanContext,
+    ) -> thunderdome::Index {
+        let base_colour_texture_id = material
+            .base_colour_texture
+            .as_ref()
+            .map(|t| self.add_user_texture(vulkan_context, t.into()))
+            .unwrap_or(NO_TEXTURE_ID);
+
+        let normal_texture_id = material
+            .normal_texture
+            .as_ref()
+            .map(|t| self.add_user_texture(vulkan_context, t.into()))
+            .unwrap_or(NO_TEXTURE_ID);
+
+        let metallic_roughness_ao_texture_id = material
+            .metallic_roughness_ao_texture
+            .as_ref()
+            .map(|t| self.add_user_texture(vulkan_context, t.into()))
+            .unwrap_or(NO_TEXTURE_ID);
+
+        let emissive_texture_id = material
+            .emissive_texture
+            .as_ref()
+            .map(|t| self.add_user_texture(vulkan_context, t.into()))
+            .unwrap_or(NO_TEXTURE_ID);
+
+        let loaded_material = GPUMaterial {
+            emissive_texture_id,
+            metallic_roughness_ao_texture_id,
+            normal_texture_id,
+            base_colour_texture_id,
+            base_colour_factor: 1, // TODO
+        };
+        self.materials.insert(loaded_material)
+    }
+
+    pub fn build_draw_calls(&self, world: &common::hecs::World) -> Vec<DrawCall> {
+        let mut draw_calls = Vec::new();
+        for (_, (transform, model)) in world.query::<(&Transform, &LoadedGLTFModel)>().iter() {
+            for primitive in &model.primitives {
+                draw_calls.push(DrawCall {
+                    geometry: primitive.geometry,
+                    material: primitive.material,
+                    transform: transform.into(),
+                });
+            }
+        }
+        draw_calls
     }
 }
 
@@ -474,7 +611,7 @@ fn create_line_pipeline(
         device
             .create_pipeline_layout(
                 &vk::PipelineLayoutCreateInfo::builder().push_constant_ranges(&[
-                    PushConstantRange {
+                    vk::PushConstantRange {
                         size: std::mem::size_of::<PushConstant>() as _,
                         stage_flags: vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
                         ..Default::default()
@@ -637,7 +774,7 @@ fn create_mesh_pipeline(
         device
             .create_pipeline_layout(
                 &vk::PipelineLayoutCreateInfo::builder()
-                    .push_constant_ranges(&[PushConstantRange {
+                    .push_constant_ranges(&[vk::PushConstantRange {
                         size: std::mem::size_of::<PushConstant>() as _,
                         stage_flags: vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
                         ..Default::default()
@@ -788,36 +925,6 @@ fn create_mesh_pipeline(
     (mesh_pipeline_layout, mesh_pipeline)
 }
 
-fn create_initial_geometry() -> (Vec<u32>, Vec<Vertex>, GeometryOffsets) {
-    let mut vertices = vec![];
-    let mut indices = vec![];
-
-    let (plane_vertices, plane_indices) = generate_mesh(Geometry::Plane);
-    let plane = IndexBufferEntry::new(plane_indices.len(), indices.len(), vertices.len());
-    vertices.extend(plane_vertices);
-    indices.extend(plane_indices);
-
-    let (cube_vertices, cube_indices) = generate_mesh(Geometry::Cube);
-    let cube = IndexBufferEntry::new(cube_indices.len(), indices.len(), vertices.len());
-    vertices.extend(cube_vertices);
-    indices.extend(cube_indices);
-
-    let (sphere_vertices, sphere_indices) = generate_mesh(Geometry::Sphere);
-    let sphere = IndexBufferEntry::new(sphere_indices.len(), indices.len(), vertices.len());
-    vertices.extend(sphere_vertices);
-    indices.extend(sphere_indices);
-
-    let offsets = GeometryOffsets {
-        plane,
-        cube,
-        sphere,
-    };
-
-    log::debug!("Created geometry offsets: {:?}", offsets);
-
-    (indices, vertices, offsets)
-}
-
 fn create_framebuffers(
     render_surface: &RenderSurface,
     render_pass: vk::RenderPass,
@@ -864,256 +971,4 @@ fn create_depth_buffers(
             }
         })
         .collect::<Vec<_>>()
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct IndexBufferEntry {
-    pub index_count: u32,
-    pub index_offset: u32,
-    pub vertex_offset: u32,
-}
-
-impl IndexBufferEntry {
-    pub fn new(index_count: usize, index_offset: usize, vertex_offset: usize) -> Self {
-        Self {
-            index_count: index_count as _,
-            index_offset: index_offset as _,
-            vertex_offset: vertex_offset as _,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct GeometryOffsets {
-    plane: IndexBufferEntry,
-    cube: IndexBufferEntry,
-    sphere: IndexBufferEntry,
-}
-impl GeometryOffsets {
-    fn get(&self, geometry: Geometry) -> IndexBufferEntry {
-        match geometry {
-            Geometry::Plane => self.plane,
-            Geometry::Sphere => self.sphere,
-            Geometry::Cube => self.cube,
-        }
-    }
-}
-
-pub fn generate_mesh(geometry: Geometry) -> (Vec<Vertex>, Vec<u32>) {
-    match geometry {
-        Geometry::Plane => {
-            let vertices = vec![
-                Vertex {
-                    position: Vec4::new(-1.0, -1.0, 0.0, 1.0),
-                    normal: Vec4::new(0.0, 0.0, 1.0, 0.0),
-                    uv: Vec2::new(0.0, 0.0),
-                },
-                Vertex {
-                    position: Vec4::new(1.0, -1.0, 0.0, 1.0),
-                    normal: Vec4::new(0.0, 0.0, 1.0, 0.0),
-                    uv: Vec2::new(1.0, 0.0),
-                },
-                Vertex {
-                    position: Vec4::new(1.0, 1.0, 0.0, 1.0),
-                    normal: Vec4::new(0.0, 0.0, 1.0, 0.0),
-                    uv: Vec2::new(1.0, 1.0),
-                },
-                Vertex {
-                    position: Vec4::new(-1.0, 1.0, 0.0, 1.0),
-                    normal: Vec4::new(0.0, 0.0, 1.0, 0.0),
-                    uv: Vec2::new(0.0, 1.0),
-                },
-            ];
-
-            let indices = vec![0, 1, 2, 2, 3, 0];
-
-            (vertices, indices)
-        }
-
-        Geometry::Sphere => {
-            // Simplified UV Sphere
-            let mut vertices = vec![];
-            let mut indices = vec![];
-            let sectors = 10;
-            let stacks = 10;
-            let radius = 1.0;
-            let pi = std::f32::consts::PI;
-
-            for i in 0..=stacks {
-                let stack_angle = pi / 2.0 - i as f32 / stacks as f32 * pi; // starting from pi/2 to -pi/2
-                let xy = radius * stack_angle.cos(); // r * cos(u)
-                let z = radius * stack_angle.sin(); // r * sin(u)
-
-                for j in 0..=sectors {
-                    let sector_angle = j as f32 / sectors as f32 * pi * 2.0; // starting from 0 to 2pi
-
-                    // vertex position (x, y, z)
-                    let x = xy * sector_angle.cos(); // r * cos(u) * cos(v)
-                    let y = xy * sector_angle.sin(); // r * cos(u) * sin(v)
-                    vertices.push(Vertex {
-                        position: Vec4::new(x, y, z, 1.0),
-                        normal: Vec4::new(x, y, z, 0.0).normalize(), // normalized
-                        uv: Vec2::new(j as f32 / sectors as f32, i as f32 / stacks as f32), // normalized
-                    });
-
-                    // indices
-                    if i != 0 && j != 0 {
-                        let a = (sectors + 1) * i + j; // current top right
-                        let b = a - 1; // current top left
-                        let c = a - (sectors + 1); // previous top right
-                        let d = a - (sectors + 1) - 1; // previous top left
-                        indices.push(a as u32);
-                        indices.push(b as u32);
-                        indices.push(c as u32);
-                        indices.push(b as u32);
-                        indices.push(d as u32);
-                        indices.push(c as u32);
-                    }
-                }
-            }
-
-            (vertices, indices)
-        }
-        Geometry::Cube => {
-            let vertices = vec![
-                // Front face
-                Vertex {
-                    position: Vec4::new(-1.0, -1.0, 1.0, 1.0),
-                    normal: Vec4::new(0.0, 0.0, 1.0, 0.0),
-                    uv: Vec2::new(0.0, 0.0),
-                },
-                Vertex {
-                    position: Vec4::new(1.0, -1.0, 1.0, 1.0),
-                    normal: Vec4::new(0.0, 0.0, 1.0, 0.0),
-                    uv: Vec2::new(1.0, 0.0),
-                },
-                Vertex {
-                    position: Vec4::new(1.0, 1.0, 1.0, 1.0),
-                    normal: Vec4::new(0.0, 0.0, 1.0, 0.0),
-                    uv: Vec2::new(1.0, 1.0),
-                },
-                Vertex {
-                    position: Vec4::new(-1.0, 1.0, 1.0, 1.0),
-                    normal: Vec4::new(0.0, 0.0, 1.0, 0.0),
-                    uv: Vec2::new(0.0, 1.0),
-                },
-                // Right face
-                Vertex {
-                    position: Vec4::new(1.0, -1.0, 1.0, 1.0),
-                    normal: Vec4::new(1.0, 0.0, 0.0, 0.0),
-                    uv: Vec2::new(0.0, 0.0),
-                },
-                Vertex {
-                    position: Vec4::new(1.0, -1.0, -1.0, 1.0),
-                    normal: Vec4::new(1.0, 0.0, 0.0, 0.0),
-                    uv: Vec2::new(1.0, 0.0),
-                },
-                Vertex {
-                    position: Vec4::new(1.0, 1.0, -1.0, 1.0),
-                    normal: Vec4::new(1.0, 0.0, 0.0, 0.0),
-                    uv: Vec2::new(1.0, 1.0),
-                },
-                Vertex {
-                    position: Vec4::new(1.0, 1.0, 1.0, 1.0),
-                    normal: Vec4::new(1.0, 0.0, 0.0, 0.0),
-                    uv: Vec2::new(0.0, 1.0),
-                },
-                // Back face
-                Vertex {
-                    position: Vec4::new(1.0, -1.0, -1.0, 1.0),
-                    normal: Vec4::new(0.0, 0.0, -1.0, 0.0),
-                    uv: Vec2::new(0.0, 0.0),
-                },
-                Vertex {
-                    position: Vec4::new(-1.0, -1.0, -1.0, 1.0),
-                    normal: Vec4::new(0.0, 0.0, -1.0, 0.0),
-                    uv: Vec2::new(1.0, 0.0),
-                },
-                Vertex {
-                    position: Vec4::new(-1.0, 1.0, -1.0, 1.0),
-                    normal: Vec4::new(0.0, 0.0, -1.0, 0.0),
-                    uv: Vec2::new(1.0, 1.0),
-                },
-                Vertex {
-                    position: Vec4::new(1.0, 1.0, -1.0, 1.0),
-                    normal: Vec4::new(0.0, 0.0, -1.0, 0.0),
-                    uv: Vec2::new(0.0, 1.0),
-                },
-                // Left face
-                Vertex {
-                    position: Vec4::new(-1.0, -1.0, -1.0, 1.0),
-                    normal: Vec4::new(-1.0, 0.0, 0.0, 0.0),
-                    uv: Vec2::new(0.0, 0.0),
-                },
-                Vertex {
-                    position: Vec4::new(-1.0, -1.0, 1.0, 1.0),
-                    normal: Vec4::new(-1.0, 0.0, 0.0, 0.0),
-                    uv: Vec2::new(1.0, 0.0),
-                },
-                Vertex {
-                    position: Vec4::new(-1.0, 1.0, 1.0, 1.0),
-                    normal: Vec4::new(-1.0, 0.0, 0.0, 0.0),
-                    uv: Vec2::new(1.0, 1.0),
-                },
-                Vertex {
-                    position: Vec4::new(-1.0, 1.0, -1.0, 1.0),
-                    normal: Vec4::new(-1.0, 0.0, 0.0, 0.0),
-                    uv: Vec2::new(0.0, 1.0),
-                },
-                // Top face
-                Vertex {
-                    position: Vec4::new(-1.0, 1.0, 1.0, 1.0),
-                    normal: Vec4::new(0.0, 1.0, 0.0, 0.0),
-                    uv: Vec2::new(0.0, 0.0),
-                },
-                Vertex {
-                    position: Vec4::new(1.0, 1.0, 1.0, 1.0),
-                    normal: Vec4::new(0.0, 1.0, 0.0, 0.0),
-                    uv: Vec2::new(1.0, 0.0),
-                },
-                Vertex {
-                    position: Vec4::new(1.0, 1.0, -1.0, 1.0),
-                    normal: Vec4::new(0.0, 1.0, 0.0, 0.0),
-                    uv: Vec2::new(1.0, 1.0),
-                },
-                Vertex {
-                    position: Vec4::new(-1.0, 1.0, -1.0, 1.0),
-                    normal: Vec4::new(0.0, 1.0, 0.0, 0.0),
-                    uv: Vec2::new(0.0, 1.0),
-                },
-                // Bottom face
-                Vertex {
-                    position: Vec4::new(-1.0, -1.0, -1.0, 1.0),
-                    normal: Vec4::new(0.0, -1.0, 0.0, 0.0),
-                    uv: Vec2::new(0.0, 0.0),
-                },
-                Vertex {
-                    position: Vec4::new(1.0, -1.0, -1.0, 1.0),
-                    normal: Vec4::new(0.0, -1.0, 0.0, 0.0),
-                    uv: Vec2::new(1.0, 0.0),
-                },
-                Vertex {
-                    position: Vec4::new(1.0, -1.0, 1.0, 1.0),
-                    normal: Vec4::new(0.0, -1.0, 0.0, 0.0),
-                    uv: Vec2::new(1.0, 1.0),
-                },
-                Vertex {
-                    position: Vec4::new(-1.0, -1.0, 1.0, 1.0),
-                    normal: Vec4::new(0.0, -1.0, 0.0, 0.0),
-                    uv: Vec2::new(0.0, 1.0),
-                },
-            ];
-
-            let indices = vec![
-                0, 1, 2, 2, 3, 0, // front
-                4, 5, 6, 6, 7, 4, // right
-                8, 9, 10, 10, 11, 8, // back
-                12, 13, 14, 14, 15, 12, // left
-                16, 17, 18, 18, 19, 16, // top
-                20, 21, 22, 22, 23, 20, // bottom
-            ];
-
-            (vertices, indices)
-        }
-    }
 }

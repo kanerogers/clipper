@@ -1,9 +1,7 @@
 use common::glam::Vec3;
+use components::{Transform, Velocity};
 
-use crate::{
-    components::{Transform, Velocity},
-    Game, Keys, PLAYER_SPEED,
-};
+use crate::{Game, Keys, PLAYER_SPEED};
 
 pub fn dave_controller(game: &mut Game) {
     let dt = game.time.delta();

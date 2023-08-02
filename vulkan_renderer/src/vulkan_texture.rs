@@ -1,4 +1,5 @@
 use ash::vk;
+use asset_loader::Texture;
 
 use crate::{descriptors::Descriptors, vulkan_context::VulkanContext};
 
@@ -40,6 +41,23 @@ impl<T: AsRef<[u8]>> VulkanTextureCreateInfo<T> {
             min_filter,
             mag_filter,
         }
+    }
+}
+
+impl<'a> From<&'a Texture> for VulkanTextureCreateInfo<&'a [u8]> {
+    fn from(value: &'a Texture) -> Self {
+        let resolution = vk::Extent2D {
+            width: value.dimensions.x,
+            height: value.dimensions.y,
+        };
+
+        Self::new(
+            &value.data,
+            vk::Format::R8G8B8A8_UNORM,
+            resolution,
+            vk::Filter::LINEAR,
+            vk::Filter::LINEAR,
+        )
     }
 }
 

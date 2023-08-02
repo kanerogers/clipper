@@ -12,10 +12,10 @@ layout(set = 0, binding = 0) uniform sampler2D textures[16];
 #include "push_constant.glsl"
 
 void main() {
-    if (texture_id == NO_TEXTURE) {
-        out_colour = vec4(colour_factor, 1.0);
+    if (base_colour_texture_id == NO_TEXTURE) {
+        out_colour = vec4(1.0);
         return;
     } 
     
-    out_colour = vec4(colour_factor, 1.0) * texture(textures[texture_id], in_uv);
+    out_colour = texture(textures[base_colour_texture_id], in_uv);
 }

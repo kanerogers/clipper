@@ -5,29 +5,12 @@ pub mod vulkan_context;
 pub mod vulkan_texture;
 
 use ash::vk;
-use common::{glam, winit, yakui, Camera, Renderer};
-use glam::{Vec2, Vec4};
+use common::{glam, hecs, winit, yakui, Camera, Renderer};
+use glam::Vec4;
 pub use lazy_renderer::LazyRenderer;
 
 pub use crate::vulkan_texture::NO_TEXTURE_ID;
 use crate::{lazy_renderer::RenderSurface, vulkan_context::VulkanContext};
-
-#[derive(Default, Debug, Clone, Copy)]
-pub struct Vertex {
-    pub position: Vec4,
-    pub normal: Vec4,
-    pub uv: Vec2,
-}
-
-impl Vertex {
-    pub fn new<T: Into<Vec4>, U: Into<Vec2>>(position: T, normal: T, uv: U) -> Self {
-        Self {
-            position: position.into(),
-            normal: normal.into(),
-            uv: uv.into(),
-        }
-    }
-}
 
 #[derive(Default, Debug, Clone, Copy)]
 pub struct LineVertex {
@@ -91,7 +74,7 @@ impl Renderer for LazyVulkan {
 
     fn render(
         &mut self,
-        meshes: &[common::Mesh],
+        world: &hecs::World,
         lines: &[common::Line],
         camera: Camera,
         yak: &mut yakui::Yakui,
@@ -116,8 +99,10 @@ impl Renderer for LazyVulkan {
                 .overwrite(context, &line_vertices)
         };
 
+        let draw_calls = self.renderer.build_draw_calls(world);
+
         self.renderer
-            ._render(context, swapchain_index, meshes, &line_vertices);
+            ._render(context, swapchain_index, &draw_calls, &line_vertices);
 
         self.yakui_vulkan
             .paint(yak, &context.into(), swapchain_index);
@@ -136,6 +121,11 @@ impl Renderer for LazyVulkan {
         unsafe {
             self.renderer.cleanup(&self.context.device);
         }
+    }
+
+    fn update_assets(&mut self, world: &mut hecs::World) {
+        let vulkan_context = &self.context;
+        self.renderer.update_assets(vulkan_context, world);
     }
 }
 
