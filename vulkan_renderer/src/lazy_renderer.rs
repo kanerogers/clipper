@@ -5,9 +5,8 @@ use crate::{
     vulkan_texture::{VulkanTexture, VulkanTextureCreateInfo},
     LineVertex, NO_TEXTURE_ID,
 };
-use asset_loader::{GLTFModel, Material, Vertex};
 use common::{glam, thunderdome, Camera, GeometryOffsets};
-use components::Transform;
+use components::{GLTFModel, Material, Transform, Vertex};
 
 use std::ffi::CStr;
 
@@ -169,6 +168,7 @@ impl DepthBuffer {
 /// Push constants!
 struct PushConstant {
     material: GPUMaterial,
+    view_pos: glam::Vec4,
     mvp: glam::Mat4,
 }
 
@@ -176,8 +176,12 @@ unsafe impl Zeroable for PushConstant {}
 unsafe impl Pod for PushConstant {}
 
 impl PushConstant {
-    pub fn new(material: GPUMaterial, mvp: glam::Mat4) -> Self {
-        Self { material, mvp }
+    pub fn new(material: GPUMaterial, view_pos: glam::Vec4, mvp: glam::Mat4) -> Self {
+        Self {
+            material,
+            view_pos,
+            mvp,
+        }
     }
 }
 
@@ -400,7 +404,11 @@ impl LazyRenderer {
                     self.mesh_pipeline_layout,
                     vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
                     0,
-                    bytemuck::bytes_of(&PushConstant::new(*material, mvp)),
+                    bytemuck::bytes_of(&PushConstant::new(
+                        *material,
+                        self.camera.position.extend(1.),
+                        mvp,
+                    )),
                 );
 
                 let GeometryOffsets {

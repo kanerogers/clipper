@@ -1,8 +1,8 @@
 use common::rapier3d::{na, prelude::*};
-use common::{glam, hecs, Line};
+use common::{glam, hecs, log, Line};
 
 use crate::Game;
-use components::{Info, Transform};
+use components::{Collider, GLTFAsset, GLTFModel, Info, Transform};
 
 pub struct PhysicsContext {
     rigid_body_set: RigidBodySet,
@@ -129,46 +129,48 @@ impl<'a> DebugRenderBackend for PhysicsRenderer<'a> {
 }
 
 fn update_colliders(game: &mut Game) {
-    for (_, (handle, transform)) in game.world.query::<(&ColliderHandle, &Transform)>().iter() {
+    for (_, (collider_info, handle, transform)) in game
+        .world
+        .query::<(&Collider, &ColliderHandle, &Transform)>()
+        .iter()
+    {
+        let mut collider_transform = transform.clone();
+        collider_transform.position.y += collider_info.y_offset;
         let collider = game.physics_context.collider_set.get_mut(*handle).unwrap();
-        collider.set_position(transform.into());
+        collider.set_position((&collider_transform).into());
     }
 }
 
 fn create_missing_collider_handles(game: &mut Game) {
     let mut command_buffer = hecs::CommandBuffer::new();
 
-    for (_entity, (transform, info)) in game
+    for (entity, (collider_info, info, transform, model)) in game
         .world
-        .query::<(&Transform, &Info)>()
+        .query::<(&mut Collider, &Info, &Transform, &GLTFModel)>()
         .without::<&ColliderHandle>()
         .iter()
     {
-        if info.name == "Ground" {
-            continue;
-        }
-        let _scale = transform.scale;
-        // let shape = match geometry {
-        //     Geometry::Plane => SharedShape::cuboid(scale.x, scale.y, 0.0),
-        //     Geometry::Sphere => SharedShape::ball(scale.x),
-        //     Geometry::Cube => SharedShape::cuboid(scale.x, scale.y, scale.z),
-        // };
+        let (y_offset, shape) = get_shape_from_model(model);
+        let mut collider_transform = transform.clone();
+        collider_transform.position.y += y_offset;
+        collider_info.y_offset = y_offset;
 
-        // let collider = ColliderBuilder::new(shape)
-        //     .position(transform.into())
-        //     .user_data(entity.to_bits().get() as _)
-        //     .active_collision_types(ActiveCollisionTypes::all())
-        //     .sensor(true);
-        // println!(
-        //     "Created collider for {} - {:?}",
-        //     info.name, collider.position
-        // );
+        let collider = ColliderBuilder::new(shape)
+            .position((&collider_transform).into())
+            .user_data(entity.to_bits().get() as _)
+            .active_collision_types(ActiveCollisionTypes::all())
+            .sensor(true);
 
-        // let handle = game.physics_context.collider_set.insert(collider.build());
+        log::info!(
+            "Created collider for {} - {:?}",
+            info.name,
+            collider.position
+        );
 
-        // command_buffer.insert_one(entity, handle);
+        let handle = game.physics_context.collider_set.insert(collider.build());
+
+        command_buffer.insert_one(entity, handle);
     }
-    // println!("..done!");
 
     command_buffer.run_on(&mut game.world);
 }
@@ -215,4 +217,31 @@ where
     fn from_na(value: na::Unit<T>) -> Self {
         Self::from_na(value.into_inner())
     }
+}
+
+fn get_shape_from_model(model: &GLTFModel) -> (f32, SharedShape) {
+    let mut max_x = f32::NEG_INFINITY;
+    let mut min_x = f32::INFINITY;
+    let mut max_y = f32::NEG_INFINITY;
+    let mut min_y = f32::INFINITY;
+    let mut max_z = f32::NEG_INFINITY;
+    let mut min_z = f32::INFINITY;
+
+    for primitive in &model.primitives {
+        for v in &primitive.vertices {
+            let pos = v.position;
+            min_x = min_x.min(pos.x);
+            max_x = max_x.max(pos.x);
+            min_y = min_y.min(pos.y);
+            max_y = max_y.max(pos.y);
+            min_z = min_z.min(pos.z);
+            max_z = max_z.max(pos.z);
+        }
+    }
+
+    let half_x = (max_x - min_x) / 2.;
+    let half_y = (max_y - min_y) / 2.;
+    let half_z = (max_z - min_z) / 2.;
+
+    (half_y, SharedShape::cuboid(half_x, half_y, half_z))
 }

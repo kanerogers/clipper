@@ -4,7 +4,7 @@ use std::{
 };
 
 use common::{
-    glam::{Affine3A, Mat4, Quat, Vec3},
+    glam::{Affine3A, Mat4, Quat, UVec2, Vec2, Vec3, Vec4},
     hecs,
     rapier3d::na,
 };
@@ -22,6 +22,12 @@ impl GLTFAsset {
     pub fn new<S: Into<String>>(name: S) -> Self {
         Self { name: name.into() }
     }
+}
+
+/// tag component to indicate that we'd like a collider based on our geometry, please
+#[derive(Debug, Clone, Default)]
+pub struct Collider {
+    pub y_offset: f32,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -234,4 +240,63 @@ impl Inventory {
     pub fn amount_of(&self, resource: Resource) -> usize {
         self.inner.get(&resource).copied().unwrap_or_default()
     }
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Vertex {
+    pub position: Vec4,
+    pub normal: Vec4,
+    pub uv: Vec2,
+}
+
+#[derive(Debug, Clone)]
+pub struct GLTFModel {
+    pub primitives: Vec<Primitive>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Material {
+    pub base_colour_texture: Option<Texture>,
+    pub base_colour_factor: Vec4,
+    pub normal_texture: Option<Texture>,
+    pub metallic_roughness_ao_texture: Option<Texture>,
+    pub emissive_texture: Option<Texture>,
+}
+
+impl Default for Material {
+    fn default() -> Self {
+        Self {
+            base_colour_texture: Default::default(),
+            base_colour_factor: Vec4::ONE,
+            normal_texture: Default::default(),
+            metallic_roughness_ao_texture: Default::default(),
+            emissive_texture: Default::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Texture {
+    /// x, y
+    pub dimensions: UVec2,
+    /// data is assumed to be R8G8B8A8
+    pub data: Vec<u8>,
+}
+
+impl Vertex {
+    pub fn new<T: Into<Vec4>, U: Into<Vec2>>(position: T, normal: T, uv: U) -> Self {
+        Self {
+            position: position.into(),
+            normal: normal.into(),
+            uv: uv.into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Primitive {
+    pub vertices: Vec<Vertex>,
+    pub indices: Vec<u32>,
+    pub material: Material,
 }
