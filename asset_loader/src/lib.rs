@@ -179,7 +179,13 @@ async fn load_and_insert(asset_name: String, sender: SyncSender<AssetResult>) {
 }
 
 fn load(asset_name: String) -> anyhow::Result<GLTFModel> {
-    let asset_path = format!("{}/../assets/{}", env!("CARGO_MANIFEST_DIR"), asset_name);
+    #[cfg(debug_assertions)]
+    let assets_folder = format!("{}/../assets", env!("CARGO_MANIFEST_DIR"));
+
+    #[cfg(not(debug_assertions))]
+    let assets_folder = "./assets";
+
+    let asset_path = format!("{assets_folder}/{asset_name}");
     let file = std::fs::read(&asset_path).context(asset_path)?;
     let glb = Glb::from_slice(&file)?;
     let root = gltf::json::Root::from_slice(&glb.json)?;

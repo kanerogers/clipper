@@ -450,7 +450,10 @@ pub fn get_physical_device(
                                         .unwrap()
                                     })
                                     .unwrap_or(true);
-                        if supports_graphics_and_surface {
+
+                        // TODO - at some point we should implement better support for low-end GPUs (eg. Intel UHD and friends)
+                        let is_discrete = instance.get_physical_device_properties(*pdevice).device_type == vk::PhysicalDeviceType::DISCRETE_GPU;
+                        if supports_graphics_and_surface && is_discrete {
                             Some((*pdevice, index))
                         } else {
                             None

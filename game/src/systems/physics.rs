@@ -2,7 +2,7 @@ use common::rapier3d::{na, prelude::*};
 use common::{glam, hecs, log, Line};
 
 use crate::Game;
-use components::{Collider, GLTFAsset, GLTFModel, Info, Transform};
+use components::{Collider, GLTFModel, Info, Transform};
 
 pub struct PhysicsContext {
     rigid_body_set: RigidBodySet,
