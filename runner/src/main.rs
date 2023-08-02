@@ -15,30 +15,14 @@ use common::{
     Renderer,
 };
 
-#[hot_lib_reloader::hot_module(dylib = "game", file_watch_debounce = 20, lib_dir = "target/debug")]
-mod hot_game {
-    hot_functions_from_file!("game/src/lib.rs");
-
-    use common::{winit, GUIState};
-    pub use game::{Game, Keys};
-}
-
-#[hot_lib_reloader::hot_module(dylib = "gui", file_watch_debounce = 20, lib_dir = "target/debug")]
-mod hot_gui {
-    hot_functions_from_file!("gui/src/lib.rs");
-
-    pub use common::GUIState;
-    pub use gui::GUI;
-}
-
 const INITIAL_SCREEN_WIDTH: u32 = 1000;
 const INITIAL_SCREEN_HEIGHT: u32 = 1000;
 
 pub fn init<R: Renderer>() -> (
     R,
     EventLoop<()>,
-    hot_gui::GUI,
-    hot_game::Game,
+    gui::GUI,
+    game::Game,
     yakui_winit::YakuiWinit,
 ) {
     env_logger::init();
@@ -51,12 +35,12 @@ pub fn init<R: Renderer>() -> (
         .with_title("Clipper".to_string())
         .build(&event_loop)
         .unwrap();
-    let mut game = hot_game::init();
+    let mut game = game::init();
     game.resized(window.inner_size());
     let yak_winit = yakui_winit::YakuiWinit::new(&window);
 
     let renderer = R::init(window);
-    let gui = hot_gui::GUI::new(INITIAL_SCREEN_WIDTH, INITIAL_SCREEN_HEIGHT);
+    let gui = gui::GUI::new(INITIAL_SCREEN_WIDTH, INITIAL_SCREEN_HEIGHT);
 
     (renderer, event_loop, gui, game, yak_winit)
 }
@@ -109,7 +93,7 @@ fn main() {
             }
             Event::WindowEvent { event, .. } => {
                 if !handled_by_yak {
-                    hot_game::handle_winit_event(&mut game, event)
+                    game::handle_winit_event(&mut game, event)
                 }
             }
             _ => (),
@@ -120,16 +104,16 @@ fn main() {
 }
 
 fn window_tick<R: Renderer>(
-    game: &mut hot_game::Game,
+    game: &mut game::Game,
     renderer: &mut R,
-    gui: &mut hot_gui::GUI,
+    gui: &mut gui::GUI,
     asset_loader: &mut asset_loader::AssetLoader,
 ) {
     game.time.start_frame();
-    hot_game::tick(game, &mut gui.state);
+    game::tick(game, &mut gui.state);
     asset_loader.load_assets(&mut game.world);
     game.input.camera_zoom = 0.;
-    hot_gui::draw_gui(gui);
+    gui::draw_gui(gui);
 
     renderer.update_assets(&mut game.world);
     renderer.render(&game.world, &game.debug_lines, game.camera, &mut gui.yak);

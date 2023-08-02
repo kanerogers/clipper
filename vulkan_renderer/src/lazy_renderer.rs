@@ -197,7 +197,7 @@ struct GPUMaterial {
     pub metallic_roughness_ao_texture_id: u32,
     pub normal_texture_id: u32,
     pub base_colour_texture_id: u32,
-    pub base_colour_factor: u32,
+    pub base_colour_factor: glam::Vec4,
 }
 
 #[derive(Debug, Clone)]
@@ -567,7 +567,7 @@ impl LazyRenderer {
             metallic_roughness_ao_texture_id,
             normal_texture_id,
             base_colour_texture_id,
-            base_colour_factor: 1, // TODO
+            base_colour_factor: material.base_colour_factor,
         };
         self.materials.insert(loaded_material)
     }

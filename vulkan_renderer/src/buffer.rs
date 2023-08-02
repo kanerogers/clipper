@@ -5,7 +5,7 @@ use ash::{util::Align, vk};
 use crate::{find_memorytype_index, vulkan_context::VulkanContext};
 
 /// Minimum size of a buffer to avoid needless allocations.
-const MIN_BUFFER_SIZE: vk::DeviceSize = 1_048_576 * 10; // 10MB
+const MIN_BUFFER_SIZE: vk::DeviceSize = 1_048_576 * 100; // 100MB
 
 /// A wrapper around a host mapped buffer on the GPU
 ///

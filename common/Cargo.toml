@@ -16,6 +16,3 @@ rapier3d = {version = "0.17.2", features = ["debug-render"]}
 thunderdome = "0.6.1"
 winit = "0.28.6"
 yakui = {git = "https://github.com/leetvr/yakui", branch = "vulkan_fixes"}
-
-[lib]
-crate-type = ["dylib", "rlib"]

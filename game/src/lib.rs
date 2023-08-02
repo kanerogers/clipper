@@ -15,7 +15,7 @@ use components::{
     Beacon, Dave, GLTFAsset, Human, HumanState, Info, Inventory, PlaceOfWork, Resource, Selected,
     Storage, Transform, Velocity,
 };
-use std::{collections::VecDeque, f32::consts::TAU};
+use std::collections::VecDeque;
 use systems::{
     beacons, click_system, dave_controller, from_na, physics, update_human_colour,
     update_human_position, update_human_state, PhysicsContext,
@@ -145,14 +145,19 @@ impl Game {
 
         // dave
         let dave = world.spawn((
+            GLTFAsset::new("droid.glb"),
             Dave::default(),
-            Transform::from_translation([0., 2., 0.].into()),
+            Transform::from_position([0., 2., 0.].into()),
             Velocity::default(),
             Info::new("DAVE"),
         ));
 
         // terrain
-        world.spawn(get_grid());
+        world.spawn((
+            Transform::default(),
+            Info::new("Ground"),
+            GLTFAsset::new("environment.glb"),
+        ));
 
         const STARTING_HUMANS: usize = 10;
         for i in 0..STARTING_HUMANS {
@@ -161,7 +166,7 @@ impl Game {
             world.spawn((
                 GLTFAsset::new("viking_1.glb"),
                 Human::default(),
-                Transform::from_translation([x, 1., z].into()),
+                Transform::from_position([x, 1., z].into()),
                 Velocity::default(),
                 Info::new(format!("Human {i}")),
             ));
@@ -169,23 +174,18 @@ impl Game {
 
         // beacon
         world.spawn((
+            GLTFAsset::new("ship.glb"),
             Beacon::default(),
-            Transform::new(
-                [0.0, 0.0, 0.0].into(),
-                Default::default(),
-                [2.0, 20., 2.0].into(),
-            ),
-            Velocity::default(),
-            Info::new("Beacon"),
+            Transform::default(),
+            Info::new("Ship"),
+            Inventory::new([]),
+            Storage,
         ));
 
         // mine
         world.spawn((
-            Transform::new(
-                [20.0, 0.0, 0.0].into(),
-                Default::default(),
-                [5.0, 1., 5.0].into(),
-            ),
+            GLTFAsset::new("mine.glb"),
+            Transform::from_position([30.0, 0.0, 0.0].into()),
             Velocity::default(),
             PlaceOfWork::mine(),
             Inventory::new([(Resource::RawIron, 5000)]),
@@ -194,11 +194,8 @@ impl Game {
 
         // forge
         world.spawn((
-            Transform::new(
-                [-20., 0.0, 0.0].into(),
-                Default::default(),
-                [2.0, 3., 2.0].into(),
-            ),
+            GLTFAsset::new("forge.glb"),
+            Transform::from_position([-30., 0.0, 0.0].into()),
             Velocity::default(),
             PlaceOfWork::forge(),
             Inventory::new([]),
@@ -207,28 +204,12 @@ impl Game {
 
         // factory
         world.spawn((
-            Transform::new(
-                [20., 0.0, 30.0].into(),
-                Default::default(),
-                [2.0, 3., 2.0].into(),
-            ),
+            GLTFAsset::new("factory.glb"),
+            Transform::from_position([20., 0.0, 30.0].into()),
             Velocity::default(),
             PlaceOfWork::factory(),
             Inventory::new([]),
-            Info::new("Forge"),
-        ));
-
-        // storage
-        world.spawn((
-            Transform::new(
-                [-20., 0.0, -30.0].into(),
-                Default::default(),
-                [2.0, 3., 2.0].into(),
-            ),
-            Velocity::default(),
-            Storage,
-            Inventory::new([]),
-            Info::new("Storage"),
+            Info::new("Factory"),
         ));
 
         camera.position.y = 3.;
@@ -309,20 +290,6 @@ impl Input {
     pub fn reset(&mut self) {
         *self = Default::default();
     }
-}
-
-fn get_grid() -> (Transform, Info) {
-    let plane_rotation = Quat::from_rotation_x(TAU / 4.0); // 90 degrees
-    let grid_size = 255;
-
-    (
-        Transform {
-            scale: [grid_size as f32, grid_size as f32, 1. as f32].into(),
-            rotation: plane_rotation,
-            ..Default::default()
-        },
-        Info::new("Ground"),
-    )
 }
 
 pub fn update_camera(game: &mut Game) {

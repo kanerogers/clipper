@@ -93,8 +93,6 @@ fn handle_keypress(game: &mut Game, keyboard_input: winit::event::KeyboardInput)
         (ElementState::Released, Some(VirtualKeyCode::E)) => {
             game_input.keyboard_state.remove(Keys::E)
         }
-
-        (ElementState::Pressed, Some(VirtualKeyCode::Escape)) => *game = super::init(),
         _ => {}
     }
 }
