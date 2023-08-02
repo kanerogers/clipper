@@ -37,7 +37,7 @@ impl Descriptors {
                         binding: 0,
                         descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
                         stage_flags: vk::ShaderStageFlags::FRAGMENT,
-                        descriptor_count: 16,
+                        descriptor_count: 1000,
                         ..Default::default()
                     }])
                     .push_next(&mut binding_flags),

@@ -50,17 +50,17 @@ impl Transform {
         }
     }
 
-    pub fn from_translation(translation: Vec3) -> Self {
+    pub fn from_position(position: Vec3) -> Self {
         Self {
-            position: translation,
+            position,
             ..Default::default()
         }
     }
 
-    pub fn from_rotation_translation(rotation: Quat, translation: Vec3) -> Self {
+    pub fn from_rotation_position(rotation: Quat, position: Vec3) -> Self {
         Self {
             rotation,
-            position: translation,
+            position,
             ..Default::default()
         }
     }

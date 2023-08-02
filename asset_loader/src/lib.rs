@@ -3,7 +3,7 @@ use common::{
     glam::{UVec2, Vec2, Vec3, Vec4},
     hecs, log,
 };
-use components::GLTFAsset;
+use components::{GLTFAsset, Info};
 use gltf::Glb;
 use image::codecs::png::PngDecoder;
 use itertools::izip;
@@ -44,13 +44,24 @@ pub struct Material {
 impl Material {
     fn import(primitive: &gltf::Primitive<'_>, blob: &[u8]) -> anyhow::Result<Self> {
         let material = primitive.material();
-        let normal_texture = Texture::import(material.normal_texture(), blob).ok();
         let pbr = material.pbr_metallic_roughness();
         let base_colour_factor = pbr.base_color_factor().into();
-        let base_colour_texture = Texture::import(pbr.base_color_texture(), blob).ok();
-        let metallic_roughness_ao_texture =
-            Texture::import(pbr.metallic_roughness_texture(), blob).ok();
-        let emissive_texture = Texture::import(material.emissive_texture(), blob).ok();
+
+        let normal_texture = Texture::import(material.normal_texture(), blob)
+            .map_err(|e| log::warn!("Unable to import normal texture: {e:?}"))
+            .ok();
+
+        let base_colour_texture = Texture::import(pbr.base_color_texture(), blob)
+            .map_err(|e| log::warn!("Unable to import base colour texture: {e:?}"))
+            .ok();
+
+        let metallic_roughness_ao_texture = Texture::import(pbr.metallic_roughness_texture(), blob)
+            .map_err(|e| log::error!("Unable to import metallic roughness AO texture: {e:?}"))
+            .ok();
+
+        let emissive_texture = Texture::import(material.emissive_texture(), blob)
+            .map_err(|e| log::error!("Unable to import emissive texture: {e:?}"))
+            .ok();
 
         Ok(Self {
             base_colour_texture,
@@ -104,13 +115,15 @@ impl Texture {
                 Err(err!("Importing images by URI is not supported"))
             }
         }?;
+        let start = view.offset();
+        let end = view.offset() + view.length();
 
-        let image_bytes = &blob[view.offset()..view.length()];
+        let image_bytes = blob
+            .get(start..end)
+            .ok_or_else(|| err!("Unable to read from blob with range {start}..{end}"))?;
         let decoder = PngDecoder::new(image_bytes)?;
         let image = image::DynamicImage::from_decoder(decoder)?;
-        let image = image
-            .as_rgba8()
-            .ok_or_else(|| err!("Error decoding image"))?;
+        let image = image.into_rgba8();
 
         Ok(Texture {
             dimensions: image.dimensions().into(),
@@ -166,7 +179,12 @@ impl AssetLoadJob {
 
 impl AssetLoader {
     pub fn load_assets(&mut self, world: &mut hecs::World) {
+        log::debug!("Checking for assets to load..");
         let mut command_buffer = hecs::CommandBuffer::new();
+
+        for (_, (asset, info)) in world.query::<(&GLTFAsset, &Info)>().iter() {
+            log::debug!("Asset {asset:?} wants to be loaded by {info:?}");
+        }
 
         // Check if there are any assets that are not yet imported
         for (entity, asset_to_import) in world
@@ -174,6 +192,7 @@ impl AssetLoader {
             .without::<hecs::Or<&GLTFModel, &AssetLoadToken>>()
             .iter()
         {
+            log::info!("Requesting load of {}", &asset_to_import.name);
             let token = self.load(&asset_to_import.name);
             command_buffer.insert_one(entity, token);
         }
@@ -305,7 +324,7 @@ mod tests {
         let mut world = hecs::World::new();
         let entities_to_spawn = 16;
         for i in 0..entities_to_spawn {
-            world.spawn((i, GLTFAsset::new("viking_1.glb")));
+            world.spawn((i, GLTFAsset::new("droid.glb")));
         }
 
         loop {
@@ -331,10 +350,10 @@ mod tests {
             .unwrap();
 
         let primitive = &model.primitives[0];
-        assert_eq!(primitive.vertices.len(), 3474);
+        assert_eq!(primitive.vertices.len(), 40455);
 
         let material = &primitive.material;
         assert!(material.base_colour_texture.is_some());
-        assert!(material.normal_texture.is_none());
+        assert!(material.normal_texture.is_some());
     }
 }
