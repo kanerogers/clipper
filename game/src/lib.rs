@@ -12,8 +12,8 @@ use common::{
 };
 
 use components::{
-    Beacon, Dave, GLTFAsset, Human, HumanState, Info, Inventory, PlaceOfWork, Resource, Selected,
-    Storage, Transform, Velocity,
+    Beacon, Collider, Dave, GLTFAsset, Human, HumanState, Info, Inventory, PlaceOfWork, Resource,
+    Selected, Storage, Transform, Velocity,
 };
 use std::collections::VecDeque;
 use systems::{
@@ -164,6 +164,7 @@ impl Game {
             let x = (rand::random::<f32>() * 50.) - 25.;
             let z = (rand::random::<f32>() * 50.) - 25.;
             world.spawn((
+                Collider::default(),
                 GLTFAsset::new("viking_1.glb"),
                 Human::default(),
                 Transform::from_position([x, 1., z].into()),
@@ -174,6 +175,7 @@ impl Game {
 
         // beacon
         world.spawn((
+            Collider::default(),
             GLTFAsset::new("ship.glb"),
             Beacon::default(),
             Transform::default(),
@@ -184,6 +186,7 @@ impl Game {
 
         // mine
         world.spawn((
+            Collider::default(),
             GLTFAsset::new("mine.glb"),
             Transform::from_position([30.0, 0.0, 0.0].into()),
             Velocity::default(),
@@ -194,6 +197,7 @@ impl Game {
 
         // forge
         world.spawn((
+            Collider::default(),
             GLTFAsset::new("forge.glb"),
             Transform::from_position([-30., 0.0, 0.0].into()),
             Velocity::default(),
@@ -204,6 +208,7 @@ impl Game {
 
         // factory
         world.spawn((
+            Collider::default(),
             GLTFAsset::new("factory.glb"),
             Transform::from_position([20., 0.0, 30.0].into()),
             Velocity::default(),

@@ -1,5 +1,5 @@
 use ash::vk;
-use asset_loader::Texture;
+use components::Texture;
 
 use crate::{descriptors::Descriptors, vulkan_context::VulkanContext};
 
@@ -53,7 +53,7 @@ impl<'a> From<&'a Texture> for VulkanTextureCreateInfo<&'a [u8]> {
 
         Self::new(
             &value.data,
-            vk::Format::R8G8B8A8_UNORM,
+            vk::Format::R8G8B8A8_SRGB,
             resolution,
             vk::Filter::LINEAR,
             vk::Filter::LINEAR,

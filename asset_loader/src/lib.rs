@@ -1,142 +1,75 @@
 use common::{
     anyhow::{self, format_err as err, Context},
-    glam::{UVec2, Vec2, Vec3, Vec4},
+    glam::Vec3,
     hecs, log,
 };
-use components::{GLTFAsset, Info};
+use components::{GLTFAsset, GLTFModel, Info, Material, Primitive, Texture, Vertex};
 use gltf::Glb;
 use image::codecs::png::PngDecoder;
 use itertools::izip;
 use std::sync::mpsc::{Receiver, SyncSender, TryRecvError};
 
-#[repr(C)]
-#[derive(Debug, Clone, Copy, Default)]
-pub struct Vertex {
-    pub position: Vec4,
-    pub normal: Vec4,
-    pub uv: Vec2,
+fn import_material(primitive: &gltf::Primitive<'_>, blob: &[u8]) -> anyhow::Result<Material> {
+    let material = primitive.material();
+    let pbr = material.pbr_metallic_roughness();
+    let base_colour_factor = pbr.base_color_factor().into();
+
+    let normal_texture = import_texture(material.normal_texture(), blob)
+        .map_err(|e| log::warn!("Unable to import normal texture: {e:?}"))
+        .ok();
+
+    let base_colour_texture = import_texture(pbr.base_color_texture(), blob)
+        .map_err(|e| log::warn!("Unable to import base colour texture: {e:?}"))
+        .ok();
+
+    let metallic_roughness_ao_texture = import_texture(pbr.metallic_roughness_texture(), blob)
+        .map_err(|e| log::error!("Unable to import metallic roughness AO texture: {e:?}"))
+        .ok();
+
+    let emissive_texture = import_texture(material.emissive_texture(), blob)
+        .map_err(|e| log::error!("Unable to import emissive texture: {e:?}"))
+        .ok();
+
+    Ok(Material {
+        base_colour_texture,
+        base_colour_factor,
+        normal_texture,
+        metallic_roughness_ao_texture,
+        emissive_texture,
+    })
 }
 
-impl Vertex {
-    pub fn new<T: Into<Vec4>, U: Into<Vec2>>(position: T, normal: T, uv: U) -> Self {
-        Self {
-            position: position.into(),
-            normal: normal.into(),
-            uv: uv.into(),
-        }
-    }
-}
+fn import_texture<'a, T>(normal_texture: Option<T>, blob: &[u8]) -> anyhow::Result<Texture>
+where
+    T: AsRef<gltf::Texture<'a>>,
+{
+    let texture = normal_texture
+        .as_ref()
+        .ok_or_else(|| err!("Texture does not exist"))?
+        .as_ref();
 
-#[derive(Debug, Clone)]
-pub struct GLTFModel {
-    pub primitives: Vec<Primitive>,
-}
+    let view = match texture.source().source() {
+        gltf::image::Source::View {
+            view,
+            mime_type: "image/png",
+        } => Ok(view),
+        gltf::image::Source::View { mime_type, .. } => Err(err!("Invalid mime_type {mime_type}")),
+        gltf::image::Source::Uri { .. } => Err(err!("Importing images by URI is not supported")),
+    }?;
+    let start = view.offset();
+    let end = view.offset() + view.length();
 
-#[derive(Debug, Clone)]
-pub struct Material {
-    pub base_colour_texture: Option<Texture>,
-    pub base_colour_factor: Vec4,
-    pub normal_texture: Option<Texture>,
-    pub metallic_roughness_ao_texture: Option<Texture>,
-    pub emissive_texture: Option<Texture>,
-}
+    let image_bytes = blob
+        .get(start..end)
+        .ok_or_else(|| err!("Unable to read from blob with range {start}..{end}"))?;
+    let decoder = PngDecoder::new(image_bytes)?;
+    let image = image::DynamicImage::from_decoder(decoder)?;
+    let image = image.into_rgba8();
 
-impl Material {
-    fn import(primitive: &gltf::Primitive<'_>, blob: &[u8]) -> anyhow::Result<Self> {
-        let material = primitive.material();
-        let pbr = material.pbr_metallic_roughness();
-        let base_colour_factor = pbr.base_color_factor().into();
-
-        let normal_texture = Texture::import(material.normal_texture(), blob)
-            .map_err(|e| log::warn!("Unable to import normal texture: {e:?}"))
-            .ok();
-
-        let base_colour_texture = Texture::import(pbr.base_color_texture(), blob)
-            .map_err(|e| log::warn!("Unable to import base colour texture: {e:?}"))
-            .ok();
-
-        let metallic_roughness_ao_texture = Texture::import(pbr.metallic_roughness_texture(), blob)
-            .map_err(|e| log::error!("Unable to import metallic roughness AO texture: {e:?}"))
-            .ok();
-
-        let emissive_texture = Texture::import(material.emissive_texture(), blob)
-            .map_err(|e| log::error!("Unable to import emissive texture: {e:?}"))
-            .ok();
-
-        Ok(Self {
-            base_colour_texture,
-            base_colour_factor,
-            normal_texture,
-            metallic_roughness_ao_texture,
-            emissive_texture,
-        })
-    }
-}
-
-impl Default for Material {
-    fn default() -> Self {
-        Self {
-            base_colour_texture: Default::default(),
-            base_colour_factor: Vec4::ONE,
-            normal_texture: Default::default(),
-            metallic_roughness_ao_texture: Default::default(),
-            emissive_texture: Default::default(),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Texture {
-    /// x, y
-    pub dimensions: UVec2,
-    /// data is assumed to be R8G8B8A8
-    pub data: Vec<u8>,
-}
-
-impl Texture {
-    fn import<'a, T>(normal_texture: Option<T>, blob: &[u8]) -> anyhow::Result<Self>
-    where
-        T: AsRef<gltf::Texture<'a>>,
-    {
-        let texture = normal_texture
-            .as_ref()
-            .ok_or_else(|| err!("Texture does not exist"))?
-            .as_ref();
-
-        let view = match texture.source().source() {
-            gltf::image::Source::View {
-                view,
-                mime_type: "image/png",
-            } => Ok(view),
-            gltf::image::Source::View { mime_type, .. } => {
-                Err(err!("Invalid mime_type {mime_type}"))
-            }
-            gltf::image::Source::Uri { .. } => {
-                Err(err!("Importing images by URI is not supported"))
-            }
-        }?;
-        let start = view.offset();
-        let end = view.offset() + view.length();
-
-        let image_bytes = blob
-            .get(start..end)
-            .ok_or_else(|| err!("Unable to read from blob with range {start}..{end}"))?;
-        let decoder = PngDecoder::new(image_bytes)?;
-        let image = image::DynamicImage::from_decoder(decoder)?;
-        let image = image.into_rgba8();
-
-        Ok(Texture {
-            dimensions: image.dimensions().into(),
-            data: image.to_vec(),
-        })
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Primitive {
-    pub vertices: Vec<Vertex>,
-    pub indices: Vec<u32>,
-    pub material: Material,
+    Ok(Texture {
+        dimensions: image.dimensions().into(),
+        data: image.to_vec(),
+    })
 }
 
 pub enum AssetLoadState {
@@ -258,16 +191,13 @@ fn load(asset_name: String) -> anyhow::Result<GLTFModel> {
         .ok_or_else(|| err!("No nodes found in glTF"))?;
 
     let mut primitives = Vec::new();
+    let mesh = node.mesh().ok_or_else(|| err!("Node has no mesh"))?;
 
-    for primitive in node
-        .mesh()
-        .ok_or_else(|| err!("Node has no mesh"))?
-        .primitives()
-    {
+    for primitive in mesh.primitives() {
         let vertices = import_vertices(&primitive, &blob)?;
         let indices = import_indices(&primitive, &blob)?;
 
-        let material = Material::import(&primitive, &blob)?;
+        let material = import_material(&primitive, &blob)?;
 
         primitives.push(Primitive {
             vertices,
