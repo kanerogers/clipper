@@ -6,7 +6,7 @@ use crate::{
     LineVertex, NO_TEXTURE_ID,
 };
 use common::{glam, thunderdome, Camera, GeometryOffsets};
-use components::{GLTFModel, Material, Transform, Vertex};
+use components::{GLTFModel, Material, MaterialOverrides, Transform, Vertex};
 
 use std::ffi::CStr;
 
@@ -209,6 +209,7 @@ pub struct DrawCall {
     pub geometry: thunderdome::Index,
     pub material: thunderdome::Index,
     pub transform: glam::Mat4,
+    pub material_overrides: Option<MaterialOverrides>,
 }
 
 impl LazyRenderer {
@@ -398,14 +399,18 @@ impl LazyRenderer {
 
             for draw_call in draw_calls {
                 let mvp = vp * draw_call.transform;
-                let material = self.materials.get(draw_call.material).unwrap();
+                let mut material = self.materials.get(draw_call.material).unwrap().clone();
+                if let Some(material_overrides) = &draw_call.material_overrides {
+                    material.base_colour_factor = material_overrides.base_colour_factor;
+                }
+
                 device.cmd_push_constants(
                     command_buffer,
                     self.mesh_pipeline_layout,
                     vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
                     0,
                     bytemuck::bytes_of(&PushConstant::new(
-                        *material,
+                        material,
                         self.camera.position.extend(1.),
                         mvp,
                     )),
@@ -528,7 +533,7 @@ impl LazyRenderer {
             .iter()
         {
             let mut primitives = Vec::new();
-            for primitive in &asset.primitives {
+            for primitive in asset.primitives.iter() {
                 let geometry = self
                     .geometry_buffers
                     .insert(&primitive.indices, &primitive.vertices);
@@ -582,12 +587,16 @@ impl LazyRenderer {
 
     pub fn build_draw_calls(&self, world: &common::hecs::World) -> Vec<DrawCall> {
         let mut draw_calls = Vec::new();
-        for (_, (transform, model)) in world.query::<(&Transform, &LoadedGLTFModel)>().iter() {
+        for (_, (transform, model, material_overrides)) in world
+            .query::<(&Transform, &LoadedGLTFModel, Option<&MaterialOverrides>)>()
+            .iter()
+        {
             for primitive in &model.primitives {
                 draw_calls.push(DrawCall {
                     geometry: primitive.geometry,
                     material: primitive.material,
                     transform: transform.into(),
+                    material_overrides: material_overrides.cloned(),
                 });
             }
         }

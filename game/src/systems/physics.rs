@@ -227,7 +227,7 @@ fn get_shape_from_model(model: &GLTFModel) -> (f32, SharedShape) {
     let mut max_z = f32::NEG_INFINITY;
     let mut min_z = f32::INFINITY;
 
-    for primitive in &model.primitives {
+    for primitive in model.primitives.iter() {
         for v in &primitive.vertices {
             let pos = v.position;
             min_x = min_x.min(pos.x);

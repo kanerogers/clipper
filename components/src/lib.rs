@@ -1,17 +1,19 @@
 use std::{
     collections::{HashMap, VecDeque},
     ops::AddAssign,
+    sync::Arc,
 };
 
 use common::{
-    glam::{Affine3A, Mat4, Quat, UVec2, Vec2, Vec3, Vec4},
-    hecs,
-    rapier3d::na,
+    glam::{UVec2, Vec2, Vec3, Vec4},
+    hecs::{self, Entity},
 };
 mod beacon;
 mod human;
+mod transform;
 pub use beacon::Beacon;
 pub use human::{Human, State as HumanState};
+pub use transform::Transform;
 
 #[derive(Debug, Clone)]
 pub struct GLTFAsset {
@@ -24,76 +26,18 @@ impl GLTFAsset {
     }
 }
 
+pub struct Targeted;
+pub struct TargetIndicator(pub hecs::Entity);
+
 /// tag component to indicate that we'd like a collider based on our geometry, please
 #[derive(Debug, Clone, Default)]
 pub struct Collider {
     pub y_offset: f32,
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct Transform {
-    pub position: Vec3,
-    pub scale: Vec3,
-    pub rotation: Quat,
-}
-
-impl Default for Transform {
-    fn default() -> Self {
-        Self {
-            position: Default::default(),
-            scale: Vec3::ONE,
-            rotation: Default::default(),
-        }
-    }
-}
-
-impl Transform {
-    pub fn new(position: Vec3, rotation: Quat, scale: Vec3) -> Self {
-        Self {
-            position,
-            scale,
-            rotation,
-        }
-    }
-
-    pub fn from_position(position: Vec3) -> Self {
-        Self {
-            position,
-            ..Default::default()
-        }
-    }
-
-    pub fn from_rotation_position(rotation: Quat, position: Vec3) -> Self {
-        Self {
-            rotation,
-            position,
-            ..Default::default()
-        }
-    }
-}
-
-impl From<&Transform> for Affine3A {
-    fn from(value: &Transform) -> Self {
-        Affine3A::from_scale_rotation_translation(value.scale, value.rotation, value.position)
-    }
-}
-
-impl From<&Transform> for Mat4 {
-    fn from(value: &Transform) -> Self {
-        Mat4::from_scale_rotation_translation(value.scale, value.rotation, value.position)
-    }
-}
-
-impl From<&Transform> for na::Isometry3<f32> {
-    fn from(value: &Transform) -> Self {
-        na::Isometry::from_parts(
-            value.position.to_array().into(),
-            na::UnitQuaternion::from_quaternion(na::Quaternion::from_parts(
-                value.rotation.w,
-                value.rotation.xyz().to_array().into(),
-            )),
-        )
-    }
+pub struct Parent {
+    pub entity: Entity,
+    pub offset: Transform,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -252,7 +196,7 @@ pub struct Vertex {
 
 #[derive(Debug, Clone)]
 pub struct GLTFModel {
-    pub primitives: Vec<Primitive>,
+    pub primitives: Arc<Vec<Primitive>>,
 }
 
 #[derive(Debug, Clone)]
@@ -299,4 +243,9 @@ pub struct Primitive {
     pub vertices: Vec<Vertex>,
     pub indices: Vec<u32>,
     pub material: Material,
+}
+
+#[derive(Debug, Clone)]
+pub struct MaterialOverrides {
+    pub base_colour_factor: Vec4,
 }

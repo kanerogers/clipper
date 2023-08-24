@@ -1,3 +1,4 @@
+mod config;
 mod input;
 mod systems;
 pub mod time;
@@ -17,8 +18,10 @@ use components::{
 };
 use std::collections::VecDeque;
 use systems::{
-    beacons, click_system, dave_controller, from_na, physics, update_human_colour,
-    update_human_position, update_human_state, PhysicsContext,
+    beacons, brainwash::brainwash_system, click_system, dave_controller,
+    find_brainwash_target::update_brainwash_target, from_na, physics,
+    target_indicator::target_indicator_system, transform_hierarchy::transform_hierarchy_system,
+    update_human_colour, update_human_position, update_human_state, PhysicsContext,
 };
 use time::Time;
 
@@ -41,12 +44,16 @@ pub fn tick(game: &mut Game, gui_state: &mut GUIState) {
         update_camera(game);
         click_system(game);
         dave_controller(game);
+        update_brainwash_target(game);
+        brainwash_system(game);
+        target_indicator_system(game);
         update_human_state(game);
         update_human_position(game);
         update_human_colour(game);
         physics(game);
         beacons(game);
         update_gui_state(game, gui_state);
+        transform_hierarchy_system(game);
     }
 
     if let Some(last_ray) = game.last_ray {
@@ -234,6 +241,18 @@ impl Game {
         self.window_size = window_size;
         self.camera.resized(window_size);
     }
+
+    pub fn dave_position(&self) -> Vec3 {
+        self.position_of(self.dave)
+    }
+
+    /// **panics**
+    ///
+    /// This method will panic if the entity does not exist.
+    pub fn position_of(&self, entity: hecs::Entity) -> Vec3 {
+        let world = &self.world;
+        world.get::<&Transform>(entity).unwrap().position
+    }
 }
 
 bitflags! {
@@ -294,6 +313,10 @@ impl Default for Input {
 impl Input {
     pub fn reset(&mut self) {
         *self = Default::default();
+    }
+
+    pub fn is_pressed(&self, key: Keys) -> bool {
+        self.keyboard_state.contains(key)
     }
 }
 
