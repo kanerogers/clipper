@@ -105,6 +105,13 @@ pub struct GUIState {
     pub idle_workers: usize,
     pub selected_item: Option<(Entity, SelectedItemInfo)>,
     pub command_queue: VecDeque<GUICommand>,
+    pub bars: BarState,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct BarState {
+    pub health_percentage: f32,
+    pub energy_percentage: f32,
 }
 
 #[derive(Debug, Clone)]

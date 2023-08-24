@@ -2,6 +2,7 @@ use std::{
     collections::{HashMap, VecDeque},
     ops::AddAssign,
     sync::Arc,
+    time::Instant,
 };
 
 use common::{
@@ -45,8 +46,34 @@ pub struct Velocity {
     pub linear: Vec3,
 }
 
-#[derive(Debug, Clone, Default)]
-pub struct Dave {}
+#[derive(Debug, Clone)]
+pub struct Dave {
+    pub energy: usize,
+    pub health: usize,
+    pub last_brainwash_time: Instant,
+    pub last_energy_drain_time: Instant,
+}
+
+impl Dave {
+    pub fn new(energy: usize, health: usize) -> Self {
+        Self {
+            energy,
+            health,
+            ..Default::default()
+        }
+    }
+}
+
+impl Default for Dave {
+    fn default() -> Self {
+        Self {
+            energy: Default::default(),
+            health: Default::default(),
+            last_brainwash_time: Instant::now(),
+            last_energy_drain_time: Instant::now(),
+        }
+    }
+}
 
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord, Hash)]
 pub enum Resource {

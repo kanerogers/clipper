@@ -1,27 +1,27 @@
 mod config;
+mod init;
 mod input;
 mod systems;
 pub mod time;
-
 use common::{
     bitflags::bitflags,
     glam::{Quat, Vec2, Vec3},
-    hecs, rand,
+    hecs::{self, RefMut},
     rapier3d::prelude::Ray,
     winit::{self},
     Camera, GUIState, HumanInfo, Line, PlaceOfWorkInfo, SelectedItemInfo,
 };
-
 use components::{
-    Beacon, Collider, Dave, GLTFAsset, Human, HumanState, Info, Inventory, PlaceOfWork, Resource,
-    Selected, Storage, Transform, Velocity,
+    Dave, Human, HumanState, Inventory, PlaceOfWork, Resource, Selected, Storage, Transform,
 };
+use config::{MAX_ENERGY, MAX_HEALTH};
 use std::collections::VecDeque;
 use systems::{
     beacons, brainwash::brainwash_system, click_system, dave_controller,
-    find_brainwash_target::update_brainwash_target, from_na, physics,
-    target_indicator::target_indicator_system, transform_hierarchy::transform_hierarchy_system,
-    update_human_colour, update_human_position, update_human_state, PhysicsContext,
+    energy_regen::energy_regen_system, find_brainwash_target::update_brainwash_target, from_na,
+    physics, target_indicator::target_indicator_system,
+    transform_hierarchy::transform_hierarchy_system, update_human_colour, update_human_position,
+    update_human_state, PhysicsContext,
 };
 use time::Time;
 
@@ -33,7 +33,7 @@ const RENDER_DEBUG_LINES: bool = false;
 // required due to reasons
 #[no_mangle]
 pub fn init() -> Game {
-    Game::new()
+    init::init_game()
 }
 
 #[no_mangle]
@@ -52,9 +52,11 @@ pub fn tick(game: &mut Game, gui_state: &mut GUIState) {
         update_human_colour(game);
         physics(game);
         beacons(game);
-        update_gui_state(game, gui_state);
+        energy_regen_system(game);
         transform_hierarchy_system(game);
     }
+
+    update_gui_state(game, gui_state);
 
     if let Some(last_ray) = game.last_ray {
         let origin = from_na(last_ray.origin);
@@ -146,97 +148,6 @@ impl Default for Game {
 }
 
 impl Game {
-    pub fn new() -> Self {
-        let mut camera = Camera::default();
-        let mut world = hecs::World::new();
-
-        // dave
-        let dave = world.spawn((
-            GLTFAsset::new("droid.glb"),
-            Dave::default(),
-            Transform::from_position([0., 2., 0.].into()),
-            Velocity::default(),
-            Info::new("DAVE"),
-        ));
-
-        // terrain
-        world.spawn((
-            Transform::default(),
-            Info::new("Ground"),
-            GLTFAsset::new("environment.glb"),
-        ));
-
-        const STARTING_HUMANS: usize = 10;
-        for i in 0..STARTING_HUMANS {
-            let x = (rand::random::<f32>() * 50.) - 25.;
-            let z = (rand::random::<f32>() * 50.) - 25.;
-            world.spawn((
-                Collider::default(),
-                GLTFAsset::new("viking_1.glb"),
-                Human::default(),
-                Transform::from_position([x, 1., z].into()),
-                Velocity::default(),
-                Info::new(format!("Human {i}")),
-            ));
-        }
-
-        // beacon
-        world.spawn((
-            Collider::default(),
-            GLTFAsset::new("ship.glb"),
-            Beacon::default(),
-            Transform::default(),
-            Info::new("Ship"),
-            Inventory::new([]),
-            Storage,
-        ));
-
-        // mine
-        world.spawn((
-            Collider::default(),
-            GLTFAsset::new("mine.glb"),
-            Transform::from_position([30.0, 0.0, 0.0].into()),
-            Velocity::default(),
-            PlaceOfWork::mine(),
-            Inventory::new([(Resource::RawIron, 5000)]),
-            Info::new("Mine"),
-        ));
-
-        // forge
-        world.spawn((
-            Collider::default(),
-            GLTFAsset::new("forge.glb"),
-            Transform::from_position([-30., 0.0, 0.0].into()),
-            Velocity::default(),
-            PlaceOfWork::forge(),
-            Inventory::new([]),
-            Info::new("Forge"),
-        ));
-
-        // factory
-        world.spawn((
-            Collider::default(),
-            GLTFAsset::new("factory.glb"),
-            Transform::from_position([20., 0.0, 30.0].into()),
-            Velocity::default(),
-            PlaceOfWork::factory(),
-            Inventory::new([]),
-            Info::new("Factory"),
-        ));
-
-        camera.position.y = 3.;
-        camera.position.z = 12.;
-        camera.distance = 50.;
-        camera.desired_distance = camera.distance;
-        camera.start_distance = camera.distance;
-        Self {
-            camera,
-            dave,
-            world,
-            ..Default::default()
-        }
-    }
-
     pub fn resized(&mut self, window_size: winit::dpi::PhysicalSize<u32>) {
         self.window_size = window_size;
         self.camera.resized(window_size);
@@ -252,6 +163,10 @@ impl Game {
     pub fn position_of(&self, entity: hecs::Entity) -> Vec3 {
         let world = &self.world;
         world.get::<&Transform>(entity).unwrap().position
+    }
+
+    pub fn dave(&self) -> RefMut<Dave> {
+        self.world.get::<&mut Dave>(self.dave).unwrap()
     }
 }
 
@@ -384,6 +299,12 @@ fn update_gui_state(game: &mut Game, gui_state: &mut GUIState) {
         .iter()
         .map(|(_, i)| i.amount_of(Resource::Paperclip))
         .sum();
+
+    {
+        let dave = game.world.get::<&Dave>(game.dave).unwrap();
+        gui_state.bars.health_percentage = dave.health as f32 / MAX_HEALTH as f32;
+        gui_state.bars.energy_percentage = dave.energy as f32 / MAX_ENERGY as f32;
+    }
 
     if let Some((entity, human)) = game
         .world

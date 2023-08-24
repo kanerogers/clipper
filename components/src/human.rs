@@ -113,7 +113,6 @@ impl State {
             // handled by brainwashing system
             State::Free | State::BeingBrainwashed(_) => {},
             State::Following => {
-
                 let Some(nearest_beacon_entity) = nearest_beacon else { return };
                 let beacon_position = world.get::<&Transform>(nearest_beacon_entity).unwrap().position;
                 if beacon_position.distance(current_position) <= BEACON_TAKEOVER_THRESHOLD {

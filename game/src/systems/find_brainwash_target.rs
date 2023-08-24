@@ -35,9 +35,16 @@ fn update_brainwash_target_inner(
         .without::<&Targeted>()
         .iter()
     {
-        if human.state == HumanState::Free && within_brainwash_range(transform, dave_position) {
-            command_buffer.insert_one(entity, Targeted);
-            return;
+        if !within_brainwash_range(transform, dave_position) {
+            continue;
+        }
+
+        match &human.state {
+            HumanState::Free | HumanState::BeingBrainwashed(_) | HumanState::Following => {
+                command_buffer.insert_one(entity, Targeted);
+                return;
+            }
+            _ => {}
         }
     }
 }

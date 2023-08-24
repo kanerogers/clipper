@@ -2,6 +2,7 @@ mod beacons;
 pub mod brainwash;
 mod click;
 pub mod dave_controller;
+pub mod energy_regen;
 pub mod find_brainwash_target;
 pub mod humans;
 mod physics;
