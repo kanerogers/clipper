@@ -11,14 +11,14 @@ use super::{Transform, PlaceOfWork, Inventory, ResourceDestination, Storage, Tas
 
 
 #[derive(Clone, Debug)]
-pub struct Human {
+pub struct Viking {
     pub state: State,
     last_update: Instant,
     pub inventory: Inventory,
     pub place_of_work: Option<hecs::Entity>,
 }
 
-impl Default for Human {
+impl Default for Viking {
     fn default() -> Self {
         Self {
             last_update: Instant::now(),
@@ -29,7 +29,7 @@ impl Default for Human {
     }
 }
 
-impl Human {
+impl Viking {
     pub fn update_velocity(&mut self, velocity: &mut Vec3, current_position: Vec3, dave_position: Vec3, world: &hecs::World) {
         match self.state {
             State::Free | State::BeingBrainwashed(_) => {

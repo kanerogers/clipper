@@ -10,11 +10,11 @@ use common::{
     hecs::{self, Entity},
 };
 mod beacon;
-mod human;
 mod transform;
+mod viking;
 pub use beacon::Beacon;
-pub use human::{Human, State as HumanState};
 pub use transform::Transform;
+pub use viking::{State as VikingState, Viking};
 
 #[derive(Debug, Clone)]
 pub struct GLTFAsset {

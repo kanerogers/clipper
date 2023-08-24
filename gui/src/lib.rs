@@ -8,7 +8,7 @@ use common::{
         widgets::{List, Pad},
         CrossAxisAlignment, MainAxisAlignment,
     },
-    BarState, GUICommand, HumanInfo, PlaceOfWorkInfo,
+    BarState, GUICommand, PlaceOfWorkInfo, VikingInfo,
 };
 pub use yakui::geometry::Rect;
 use yakui::{
@@ -66,7 +66,7 @@ pub fn draw_gui(gui: &mut GUI) {
             let mut container = widgets::ColoredBox::container(Color::rgba(0, 0, 0, 200));
             container.min_size.x = 200.;
             container.show_children(|| match selected_item {
-                common::SelectedItemInfo::Human(h) => human(*entity, h, commands),
+                common::SelectedItemInfo::Viking(h) => viking(*entity, h, commands),
                 common::SelectedItemInfo::PlaceOfWork(p) => place_of_work(*entity, p, commands),
                 common::SelectedItemInfo::Storage(s) => storage(s),
             });
@@ -118,8 +118,8 @@ fn storage(s: &common::StorageInfo) {
     });
 }
 
-fn human(entity: hecs::Entity, h: &HumanInfo, commands: &mut VecDeque<GUICommand>) {
-    let HumanInfo {
+fn viking(entity: hecs::Entity, h: &VikingInfo, commands: &mut VecDeque<GUICommand>) {
+    let VikingInfo {
         name,
         state,
         place_of_work,

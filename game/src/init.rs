@@ -4,8 +4,8 @@ use crate::{
 };
 use common::{hecs, rand, Camera};
 use components::{
-    Beacon, Collider, Dave, GLTFAsset, Human, Info, Inventory, PlaceOfWork, Resource, Storage,
-    Transform, Velocity,
+    Beacon, Collider, Dave, GLTFAsset, Info, Inventory, PlaceOfWork, Resource, Storage, Transform,
+    Velocity, Viking,
 };
 
 pub fn init_game() -> Game {
@@ -35,10 +35,10 @@ pub fn init_game() -> Game {
         world.spawn((
             Collider::default(),
             GLTFAsset::new("viking_1.glb"),
-            Human::default(),
+            Viking::default(),
             Transform::from_position([x, 1., z].into()),
             Velocity::default(),
-            Info::new(format!("Human {i}")),
+            Info::new(format!("Viking {i}")),
         ));
     }
 

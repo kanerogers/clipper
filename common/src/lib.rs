@@ -116,13 +116,13 @@ pub struct BarState {
 
 #[derive(Debug, Clone)]
 pub enum SelectedItemInfo {
-    Human(HumanInfo),
+    Viking(VikingInfo),
     PlaceOfWork(PlaceOfWorkInfo),
     Storage(StorageInfo),
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct HumanInfo {
+pub struct VikingInfo {
     pub name: String,
     pub state: String,
     pub inventory: String,
