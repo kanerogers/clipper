@@ -2,7 +2,7 @@ use crate::config::{
     AWAITING_ASSIGNMENT_COLOUR, BRAINWASH_TIME, FOLLOWING_COLOUR, FREE_COLOUR, WORKING_COLOUR,
 };
 use crate::Game;
-use common::glam::{self, Vec3};
+use common::glam::Vec3;
 use common::hecs::{self, CommandBuffer};
 use components::{
     GLTFAsset, Human, HumanState, MaterialOverrides, Parent, TargetIndicator, Targeted, Transform,

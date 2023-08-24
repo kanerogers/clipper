@@ -3,11 +3,17 @@ use std::collections::VecDeque;
 pub use common::GUIState;
 use common::{
     hecs,
-    yakui::{self, button},
-    GUICommand, HumanInfo, PlaceOfWorkInfo,
+    yakui::{
+        self, button, pad,
+        widgets::{List, Pad},
+        CrossAxisAlignment, MainAxisAlignment,
+    },
+    BarState, GUICommand, HumanInfo, PlaceOfWorkInfo,
 };
 pub use yakui::geometry::Rect;
-use yakui::{colored_box_container, column, expanded, row, text, widgets, Color, MainAxisSize};
+use yakui::{
+    colored_box, colored_box_container, column, expanded, row, text, widgets, Color, MainAxisSize,
+};
 pub struct GUI {
     pub yak: yakui::Yakui,
     pub state: GUIState,
@@ -44,6 +50,7 @@ pub fn draw_gui(gui: &mut GUI) {
     let paperclip_count = gui_state.paperclips;
     let idle_worker_count = gui_state.idle_workers;
     let commands = &mut gui_state.command_queue;
+
     row(|| {
         colored_box_container(Color::rgba(0, 0, 0, 200), || {
             let mut col = widgets::List::column();
@@ -65,7 +72,42 @@ pub fn draw_gui(gui: &mut GUI) {
             });
         }
     });
+    bars(&gui_state.bars);
     gui.yak.finish();
+}
+
+fn bars(bar_state: &BarState) {
+    let mut bars = List::row();
+    bars.main_axis_alignment = MainAxisAlignment::Center;
+    bars.cross_axis_alignment = CrossAxisAlignment::End;
+
+    bars.show(|| {
+        let mut container = widgets::ColoredBox::container(Color::rgba(0, 0, 0, 200));
+        container.min_size = [200., 20.].into();
+        container.show_children(|| {
+            pad(Pad::balanced(20., 10.), || {
+                let mut column = List::column();
+                column.main_axis_size = MainAxisSize::Min;
+                column.main_axis_alignment = MainAxisAlignment::End;
+                column.cross_axis_alignment = CrossAxisAlignment::Start;
+                column.show(|| {
+                    bar("Health", Color::RED, bar_state.health_percentage);
+                    bar("Energy", Color::BLUE, bar_state.energy_percentage);
+                });
+            });
+        });
+    });
+}
+
+fn bar(label: &'static str, colour: Color, percentage: f32) {
+    let mut row = List::row();
+    row.main_axis_alignment = MainAxisAlignment::Start;
+    row.item_spacing = 10.;
+    row.cross_axis_alignment = CrossAxisAlignment::Center;
+    row.show(|| {
+        text(14., label);
+        colored_box(colour, [100. * percentage, 10.]);
+    });
 }
 
 fn storage(s: &common::StorageInfo) {
