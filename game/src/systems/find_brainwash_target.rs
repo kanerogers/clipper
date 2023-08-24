@@ -1,5 +1,5 @@
 use common::{glam, hecs};
-use components::{Human, HumanState, Targeted, Transform};
+use components::{Targeted, Transform, Viking, VikingState};
 
 use crate::{config::BRAINWASH_DISTANCE_THRESHOLD, Game};
 
@@ -30,8 +30,8 @@ fn update_brainwash_target_inner(
         return;
     }
 
-    for (entity, (human, transform)) in world
-        .query::<(&Human, &Transform)>()
+    for (entity, (viking, transform)) in world
+        .query::<(&Viking, &Transform)>()
         .without::<&Targeted>()
         .iter()
     {
@@ -39,8 +39,8 @@ fn update_brainwash_target_inner(
             continue;
         }
 
-        match &human.state {
-            HumanState::Free | HumanState::BeingBrainwashed(_) | HumanState::Following => {
+        match &viking.state {
+            VikingState::Free | VikingState::BeingBrainwashed(_) | VikingState::Following => {
                 command_buffer.insert_one(entity, Targeted);
                 return;
             }

@@ -9,10 +9,10 @@ use common::{
     hecs::{self, RefMut},
     rapier3d::prelude::Ray,
     winit::{self},
-    Camera, GUIState, HumanInfo, Line, PlaceOfWorkInfo, SelectedItemInfo,
+    Camera, GUIState, Line, PlaceOfWorkInfo, SelectedItemInfo, VikingInfo,
 };
 use components::{
-    Dave, Human, HumanState, Inventory, PlaceOfWork, Resource, Selected, Storage, Transform,
+    Dave, Inventory, PlaceOfWork, Resource, Selected, Storage, Transform, Viking, VikingState,
 };
 use config::{MAX_ENERGY, MAX_HEALTH};
 use std::collections::VecDeque;
@@ -20,8 +20,8 @@ use systems::{
     beacons, brainwash::brainwash_system, click_system, dave_controller,
     energy_regen::energy_regen_system, find_brainwash_target::update_brainwash_target, from_na,
     physics, target_indicator::target_indicator_system,
-    transform_hierarchy::transform_hierarchy_system, update_human_colour, update_human_position,
-    update_human_state, PhysicsContext,
+    transform_hierarchy::transform_hierarchy_system, update_viking_position,
+    viking_work::viking_work_system, PhysicsContext,
 };
 use time::Time;
 
@@ -47,9 +47,8 @@ pub fn tick(game: &mut Game, gui_state: &mut GUIState) {
         update_brainwash_target(game);
         brainwash_system(game);
         target_indicator_system(game);
-        update_human_state(game);
-        update_human_position(game);
-        update_human_colour(game);
+        viking_work_system(game);
+        update_viking_position(game);
         physics(game);
         beacons(game);
         energy_regen_system(game);
@@ -88,12 +87,12 @@ fn process_gui_command_queue(game: &mut Game, command_queue: &mut VecDeque<commo
                 if desired_worker_count > current_workers {
                     if let Some(worker_entity) = find_available_worker(world) {
                         place_of_work.workers.push_front(worker_entity);
-                        let mut worker = world.get::<&mut Human>(worker_entity).unwrap();
+                        let mut worker = world.get::<&mut Viking>(worker_entity).unwrap();
                         worker.assign_place_of_work(place_of_work_entity);
                     }
                 } else {
                     if let Some(worker_entity) = place_of_work.workers.pop_back() {
-                        let mut worker = world.get::<&mut Human>(worker_entity).unwrap();
+                        let mut worker = world.get::<&mut Viking>(worker_entity).unwrap();
                         worker.unassign_work();
                     }
                 }
@@ -104,9 +103,9 @@ fn process_gui_command_queue(game: &mut Game, command_queue: &mut VecDeque<commo
 }
 
 fn find_available_worker(world: &hecs::World) -> Option<hecs::Entity> {
-    let mut query = world.query::<&Human>();
-    for (entity, human) in query.iter() {
-        if human.state == HumanState::AwaitingAssignment {
+    let mut query = world.query::<&Viking>();
+    for (entity, viking) in query.iter() {
+        if viking.state == VikingState::AwaitingAssignment {
             return Some(entity);
         }
     }
@@ -287,9 +286,9 @@ fn set_camera_distance(input: &Input, camera: &mut Camera, dt: f32) {
 fn update_gui_state(game: &mut Game, gui_state: &mut GUIState) {
     gui_state.idle_workers = game
         .world
-        .query_mut::<&Human>()
+        .query_mut::<&Viking>()
         .into_iter()
-        .filter(|(_, h)| h.state == HumanState::AwaitingAssignment)
+        .filter(|(_, h)| h.state == VikingState::AwaitingAssignment)
         .count();
 
     gui_state.paperclips = game
@@ -306,23 +305,26 @@ fn update_gui_state(game: &mut Game, gui_state: &mut GUIState) {
         gui_state.bars.energy_percentage = dave.energy as f32 / MAX_ENERGY as f32;
     }
 
-    if let Some((entity, human)) = game
+    if let Some((entity, viking)) = game
         .world
-        .query::<&Human>()
+        .query::<&Viking>()
         .with::<&Selected>()
         .iter()
         .next()
     {
-        let place_of_work = human
+        let place_of_work = viking
             .place_of_work
             .map(|p| game.world.get::<&PlaceOfWork>(p).unwrap().place_type);
         gui_state.selected_item = Some((
             entity,
-            SelectedItemInfo::Human(HumanInfo {
-                inventory: format!("{:?}", human.inventory),
+            SelectedItemInfo::Viking(VikingInfo {
+                inventory: format!("{:?}", viking.inventory),
                 name: "Boris".into(),
-                state: format!("{:?}", human.state),
+                state: format!("{}", viking.state),
                 place_of_work: format!("{place_of_work:?}"),
+                intelligence: viking.intelligence,
+                strength: viking.strength,
+                stamina: viking.stamina,
             }),
         ));
         return;

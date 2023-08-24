@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use components::{Human, HumanState, Targeted};
+use components::{Targeted, Viking, VikingState};
 
 pub use crate::Game;
 use crate::{
@@ -15,32 +15,32 @@ pub fn brainwash_system(game: &mut Game) {
     let is_brainwashing = game.input.is_pressed(Keys::Space) && dave.energy >= 1;
     let mut did_brainwash = false;
 
-    // Find any targeted humans
-    for (_, human) in world.query::<&mut Human>().with::<&Targeted>().iter() {
-        match &mut human.state {
-            HumanState::Free => {
+    // Find any targeted vikings
+    for (_, viking) in world.query::<&mut Viking>().with::<&Targeted>().iter() {
+        match &mut viking.state {
+            VikingState::Free => {
                 // If we're holding down the brainwash key, start brainwashing them.
                 if is_brainwashing {
-                    human.state = HumanState::BeingBrainwashed(0.);
+                    viking.state = VikingState::BeingBrainwashed(0.);
                 }
             }
-            HumanState::BeingBrainwashed(amount) => {
+            VikingState::BeingBrainwashed(amount) => {
                 // If we're NOT holding down the brainwash key, set them free.
                 if !is_brainwashing {
-                    human.state = HumanState::Free;
+                    viking.state = VikingState::Free;
                     continue;
                 }
 
-                *amount += dt;
+                *amount += dt * 1. / viking.stamina as f32;
                 did_brainwash = true;
 
                 if *amount >= BRAINWASH_TIME {
-                    human.state = HumanState::Following;
+                    viking.state = VikingState::Following;
                 }
             }
-            HumanState::Following => {
+            VikingState::Following => {
                 if !is_brainwashing {
-                    human.state = HumanState::Free;
+                    viking.state = VikingState::Free;
                     continue;
                 }
                 did_brainwash = true;
@@ -55,11 +55,11 @@ pub fn brainwash_system(game: &mut Game) {
         dave.last_energy_drain_time = Instant::now();
     }
 
-    // Reset the brainwash state of any humans who are no longer being targeted
-    for (_, human) in world.query::<&mut Human>().without::<&Targeted>().iter() {
-        match &mut human.state {
-            HumanState::BeingBrainwashed(_) | HumanState::Following => {
-                human.state = HumanState::Free;
+    // Reset the brainwash state of any vikings who are no longer being targeted
+    for (_, viking) in world.query::<&mut Viking>().without::<&Targeted>().iter() {
+        match &mut viking.state {
+            VikingState::BeingBrainwashed(_) | VikingState::Following => {
+                viking.state = VikingState::Free;
             }
             _ => {}
         }

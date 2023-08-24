@@ -2,10 +2,14 @@ use crate::{
     config::{MAX_ENERGY, MAX_HEALTH},
     Game,
 };
-use common::{hecs, rand, Camera};
+use common::{
+    hecs,
+    rand::{self, Rng},
+    Camera,
+};
 use components::{
-    Beacon, Collider, Dave, GLTFAsset, Human, Info, Inventory, PlaceOfWork, Resource, Storage,
-    Transform, Velocity,
+    Beacon, Collider, Dave, GLTFAsset, Info, Inventory, PlaceOfWork, Resource, Storage, Transform,
+    Velocity, Viking,
 };
 
 pub fn init_game() -> Game {
@@ -28,17 +32,22 @@ pub fn init_game() -> Game {
         GLTFAsset::new("environment.glb"),
     ));
 
-    const STARTING_HUMANS: usize = 10;
-    for i in 0..STARTING_HUMANS {
-        let x = (rand::random::<f32>() * 50.) - 25.;
-        let z = (rand::random::<f32>() * 50.) - 25.;
+    let mut rng = rand::thread_rng();
+
+    const STARTING_VIKINGS: usize = 10;
+    for i in 0..STARTING_VIKINGS {
+        let x = (rng.gen::<f32>() * 50.) - 25.;
+        let z = (rng.gen::<f32>() * 50.) - 25.;
+        let intelligence = rng.gen_range(1..5);
+        let strength = rng.gen_range(1..5);
+        let stamina = rng.gen_range(1..5);
         world.spawn((
             Collider::default(),
             GLTFAsset::new("viking_1.glb"),
-            Human::default(),
+            Viking::new(intelligence, strength, stamina),
             Transform::from_position([x, 1., z].into()),
             Velocity::default(),
-            Info::new(format!("Human {i}")),
+            Info::new(format!("Viking {i}")),
         ));
     }
 
