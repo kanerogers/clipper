@@ -32,9 +32,8 @@ pub fn update_human_colour(game: &mut Game) {
 pub fn update_human_state(game: &mut Game) {
     let world = &game.world;
     let dt = game.time.delta();
-    let dave_position = world.get::<&Transform>(game.dave).unwrap().position;
 
     for (me, (human, transform)) in world.query::<(&mut Human, &mut Transform)>().iter() {
-        human.update_state(transform.position, dave_position, world, dt, me);
+        human.update_state(transform.position, world, dt, me);
     }
 }

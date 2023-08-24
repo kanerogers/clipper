@@ -14,7 +14,7 @@ pub fn dave_controller(game: &mut Game) {
 
     let input_movement = Vec3::new(
         input.keyboard_state.as_axis(Keys::A, Keys::D),
-        input.keyboard_state.as_axis(Keys::C, Keys::Space),
+        0.,
         input.keyboard_state.as_axis(Keys::W, Keys::S),
     )
     .normalize();

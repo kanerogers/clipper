@@ -65,8 +65,8 @@ impl Human {
         }
     }
 
-    pub fn update_state(&mut self, current_position: Vec3, dave_position: Vec3, world: &hecs::World, dt: f32, me: hecs::Entity) {
-        self.state.update(world, dt, current_position, dave_position, me, self.place_of_work.clone(), &mut self.inventory)
+    pub fn update_state(&mut self, current_position: Vec3, world: &hecs::World, dt: f32, me: hecs::Entity) {
+        self.state.update(world, dt, current_position, me, self.place_of_work.clone(), &mut self.inventory)
     }
 
     pub fn assign_place_of_work(&mut self, place_of_work_entity: hecs::Entity) {
@@ -94,13 +94,8 @@ pub enum State {
     DroppingOffResource(hecs::Entity),
 }
 
-const FREE_COLOUR: Vec3 = Vec3::new(1., 0., 0.);
-const FOLLOWING_COLOUR: Vec3 = Vec3::new(0., 0., 1.);
-const AWAITING_ASSIGNMENT_COLOUR: Vec3 = Vec3::new(1., 0.85, 0.);
-const WORKING_COLOUR: Vec3 = Vec3::new(0., 0.85, 0.);
-const BRAINWASH_TIME: f32 = 5.;
 const WORK_TIME: f32 = 5.;
-const BRAINWASH_DISTANCE_THRESHOLD: f32 = 5.0;
+const BRAINWASH_TIME: f32 = 5.;
 const BEACON_TAKEOVER_THRESHOLD: f32 = 10.;
 
 impl State {
@@ -109,35 +104,15 @@ impl State {
         world: &hecs::World,
         dt: f32,
         current_position: Vec3,
-        dave_position: Vec3,
         me: hecs::Entity,
         place_of_work_entity: Option<hecs::Entity>,
         inventory: &mut Inventory,
     ) {
-        let distance_to_dave = current_position.distance(dave_position);
-        let within_brainwash_threshold = distance_to_dave <= BRAINWASH_DISTANCE_THRESHOLD;
         let nearest_beacon = find_nearest_beacon(&current_position, world);
         match self {
-            State::Free => {
-                if within_brainwash_threshold {
-                    *self = State::BeingBrainwashed(0.);
-                }
-            }
-            State::BeingBrainwashed(brainwash_time_elapsed) => {
-                if within_brainwash_threshold {
-                    *brainwash_time_elapsed += dt;
-                } else {
-                    *self = State::Free;
-                    return;
-                }
-                if *brainwash_time_elapsed >= BRAINWASH_TIME {
-                    *self = State::Following;
-                }
-            }
+            // handled by brainwashing system
+            State::Free | State::BeingBrainwashed(_) => {},
             State::Following => {
-                if !within_brainwash_threshold {
-                    *self = State::Free;
-                }
 
                 let Some(nearest_beacon_entity) = nearest_beacon else { return };
                 let beacon_position = world.get::<&Transform>(nearest_beacon_entity).unwrap().position;
@@ -215,22 +190,6 @@ impl State {
 
                 *work_time_elapsed += dt;
             }
-        }
-    }
-    pub fn get_colour(&self) -> Vec3 {
-        match self {
-            State::Free => FREE_COLOUR,
-            State::BeingBrainwashed(amount) => {
-                let brainwashed_percentage = *amount as f32 / BRAINWASH_TIME as f32;
-                FREE_COLOUR.lerp(FOLLOWING_COLOUR, brainwashed_percentage)
-            }
-            State::Following => FOLLOWING_COLOUR,
-            State::BecomingWorker(amount) => {
-                let brainwashed_percentage = *amount as f32 / BRAINWASH_TIME as f32;
-                FOLLOWING_COLOUR.lerp(AWAITING_ASSIGNMENT_COLOUR, brainwashed_percentage)
-            }
-            State::AwaitingAssignment => AWAITING_ASSIGNMENT_COLOUR,
-            _ => WORKING_COLOUR,
         }
     }
 }

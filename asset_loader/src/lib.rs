@@ -7,7 +7,13 @@ use components::{GLTFAsset, GLTFModel, Info, Material, Primitive, Texture, Verte
 use gltf::Glb;
 use image::codecs::png::PngDecoder;
 use itertools::izip;
-use std::sync::mpsc::{Receiver, SyncSender, TryRecvError};
+use std::{
+    collections::HashMap,
+    sync::{
+        mpsc::{Receiver, SyncSender, TryRecvError},
+        Arc,
+    },
+};
 
 fn import_material(primitive: &gltf::Primitive<'_>, blob: &[u8]) -> anyhow::Result<Material> {
     let material = primitive.material();
@@ -82,6 +88,7 @@ pub enum AssetLoadState {
 pub struct AssetLoader {
     threadpool: futures_executor::ThreadPool,
     jobs: thunderdome::Arena<AssetLoadJob>,
+    cache: HashMap<String, GLTFModel>,
 }
 
 type AssetResult = anyhow::Result<GLTFModel>;
@@ -126,12 +133,23 @@ impl AssetLoader {
             .iter()
         {
             log::info!("Requesting load of {}", &asset_to_import.name);
+            if let Some(asset) = self.cache.get(&asset_to_import.name).cloned() {
+                log::info!(
+                    "{} is already in the cache; returning",
+                    &asset_to_import.name
+                );
+                command_buffer.insert_one(entity, asset);
+                continue;
+            }
+
             let token = self.load(&asset_to_import.name);
             command_buffer.insert_one(entity, token);
         }
 
         // Check on the status of any tokens
-        for (entity, token) in world.query::<&AssetLoadToken>().iter() {
+        for (entity, (token, asset_to_import)) in
+            world.query::<(&AssetLoadToken, &GLTFAsset)>().iter()
+        {
             match self.check(token) {
                 AssetLoadState::Loading => continue,
                 AssetLoadState::Failed(e) => {
@@ -140,6 +158,7 @@ impl AssetLoader {
                 }
                 AssetLoadState::Loaded(asset) => {
                     log::info!("Successfully imported asset!");
+                    self.cache.insert(asset_to_import.name.clone(), asset.clone());
                     command_buffer.remove_one::<AssetLoadToken>(entity);
                     command_buffer.insert_one(entity, asset);
                 }
@@ -154,6 +173,7 @@ impl AssetLoader {
         Self {
             threadpool,
             jobs: Default::default(),
+            cache: Default::default(),
         }
     }
 
@@ -212,7 +232,9 @@ fn load(asset_name: String) -> anyhow::Result<GLTFModel> {
         });
     }
 
-    return Ok(GLTFModel { primitives });
+    return Ok(GLTFModel {
+        primitives: Arc::new(primitives),
+    });
 }
 
 fn import_vertices(primitive: &gltf::Primitive<'_>, blob: &[u8]) -> anyhow::Result<Vec<Vertex>> {
