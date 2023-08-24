@@ -14,7 +14,7 @@ mod transform;
 mod viking;
 pub use beacon::Beacon;
 pub use transform::Transform;
-pub use viking::{State as VikingState, Viking};
+pub use viking::{BrainwashState as VikingState, Viking};
 
 #[derive(Debug, Clone)]
 pub struct GLTFAsset {

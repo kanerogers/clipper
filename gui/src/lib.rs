@@ -124,6 +124,9 @@ fn viking(entity: hecs::Entity, h: &VikingInfo, commands: &mut VecDeque<GUIComma
         state,
         place_of_work,
         inventory,
+        stamina,
+        strength,
+        intelligence,
     } = &h;
     column(|| {
         text(30., "Worker");
@@ -131,6 +134,9 @@ fn viking(entity: hecs::Entity, h: &VikingInfo, commands: &mut VecDeque<GUIComma
         text(20., format!("State: {state}"));
         text(20., format!("Place of work: {place_of_work}"));
         text(20., format!("Inventory: {inventory}"));
+        text(20., format!("Strength: {strength}"));
+        text(20., format!("Stamina: {stamina}"));
+        text(20., format!("Intelligence: {intelligence}"));
         let res = button("Liquify");
         if res.clicked {
             commands.push_back(GUICommand::Liquify(entity))

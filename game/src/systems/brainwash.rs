@@ -31,7 +31,7 @@ pub fn brainwash_system(game: &mut Game) {
                     continue;
                 }
 
-                *amount += dt;
+                *amount += dt * 1. / viking.stamina as f32;
                 did_brainwash = true;
 
                 if *amount >= BRAINWASH_TIME {

@@ -20,8 +20,8 @@ use systems::{
     beacons, brainwash::brainwash_system, click_system, dave_controller,
     energy_regen::energy_regen_system, find_brainwash_target::update_brainwash_target, from_na,
     physics, target_indicator::target_indicator_system,
-    transform_hierarchy::transform_hierarchy_system, update_viking_position, update_viking_state,
-    PhysicsContext,
+    transform_hierarchy::transform_hierarchy_system, update_viking_position,
+    viking_work::viking_work_system, PhysicsContext,
 };
 use time::Time;
 
@@ -47,7 +47,7 @@ pub fn tick(game: &mut Game, gui_state: &mut GUIState) {
         update_brainwash_target(game);
         brainwash_system(game);
         target_indicator_system(game);
-        update_viking_state(game);
+        viking_work_system(game);
         update_viking_position(game);
         physics(game);
         beacons(game);
@@ -320,8 +320,11 @@ fn update_gui_state(game: &mut Game, gui_state: &mut GUIState) {
             SelectedItemInfo::Viking(VikingInfo {
                 inventory: format!("{:?}", viking.inventory),
                 name: "Boris".into(),
-                state: format!("{:?}", viking.state),
+                state: format!("{}", viking.state),
                 place_of_work: format!("{place_of_work:?}"),
+                intelligence: viking.intelligence,
+                strength: viking.strength,
+                stamina: viking.stamina,
             }),
         ));
         return;

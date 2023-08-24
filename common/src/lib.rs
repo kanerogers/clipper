@@ -127,6 +127,9 @@ pub struct VikingInfo {
     pub state: String,
     pub inventory: String,
     pub place_of_work: String,
+    pub intelligence: usize,
+    pub strength: usize,
+    pub stamina: usize,
 }
 
 #[derive(Debug, Clone, Default)]
