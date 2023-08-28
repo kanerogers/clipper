@@ -10,9 +10,13 @@ use common::{
     hecs::{self, Entity},
 };
 mod beacon;
+mod brainwash_state;
+mod job;
 mod transform;
 mod viking;
 pub use beacon::Beacon;
+pub use brainwash_state::BrainwashState;
+pub use job::{Job, JobState};
 pub use transform::Transform;
 pub use viking::{BrainwashState as VikingState, Viking};
 
@@ -125,6 +129,14 @@ impl Task {
             Task::Gather => Resource::RawIron,
             Task::Smelt => Resource::Iron,
             Task::MakePaperclips => Resource::Paperclip,
+        }
+    }
+
+    pub const fn work_duration(&self) -> f32 {
+        match self {
+            Task::Gather => 8.,
+            Task::Smelt => 4.,
+            Task::MakePaperclips => 5.,
         }
     }
 }

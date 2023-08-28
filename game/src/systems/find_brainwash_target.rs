@@ -1,5 +1,5 @@
 use common::{glam, hecs};
-use components::{Targeted, Transform, Viking, VikingState};
+use components::{Job, Targeted, Transform, Viking};
 
 use crate::{config::BRAINWASH_DISTANCE_THRESHOLD, Game};
 
@@ -30,22 +30,17 @@ fn update_brainwash_target_inner(
         return;
     }
 
-    for (entity, (viking, transform)) in world
-        .query::<(&Viking, &Transform)>()
-        .without::<&Targeted>()
+    for (entity, transform) in world
+        .query::<&Transform>()
+        .with::<&Viking>()
+        .without::<(&Targeted, &Job)>()
         .iter()
     {
         if !within_brainwash_range(transform, dave_position) {
             continue;
         }
 
-        match &viking.state {
-            VikingState::Free | VikingState::BeingBrainwashed(_) | VikingState::Following => {
-                command_buffer.insert_one(entity, Targeted);
-                return;
-            }
-            _ => {}
-        }
+        command_buffer.insert_one(entity, Targeted);
     }
 }
 
