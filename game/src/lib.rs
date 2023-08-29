@@ -9,19 +9,21 @@ use common::{
     hecs::{self, RefMut},
     rapier3d::prelude::Ray,
     winit::{self},
-    Camera, GUIState, Line, PlaceOfWorkInfo, SelectedItemInfo, VikingInfo,
+    Camera, GUICommand, GUIState, Line, PlaceOfWorkInfo, SelectedItemInfo, VikingInfo,
 };
 use components::{
-    Dave, Inventory, PlaceOfWork, Resource, Selected, Storage, Transform, Viking, VikingState,
+    BrainwashState, Dave, Health, Inventory, Job, PlaceOfWork, Resource, Selected, Storage,
+    Transform, Viking,
 };
 use config::{MAX_ENERGY, MAX_HEALTH};
+use init::init_game;
 use std::collections::VecDeque;
 use systems::{
-    beacons, brainwash::brainwash_system, click_system, dave_controller,
-    energy_regen::energy_regen_system, find_brainwash_target::update_brainwash_target, from_na,
-    physics, target_indicator::target_indicator_system,
-    transform_hierarchy::transform_hierarchy_system, update_viking_position,
-    viking_work::viking_work_system, PhysicsContext,
+    beacons, brainwash::brainwash_system, click_system, combat::combat_system, dave_controller,
+    find_brainwash_target::update_brainwash_target, from_na, game_over::game_over_system, physics,
+    regen::regen_system, target_indicator::target_indicator_system,
+    transform_hierarchy::transform_hierarchy_system, update_position::update_position_system,
+    viking_velocity::update_viking_velocity, viking_work::viking_work_system, PhysicsContext,
 };
 use time::Time;
 
@@ -37,21 +39,29 @@ pub fn init() -> Game {
 }
 
 #[no_mangle]
-pub fn tick(game: &mut Game, gui_state: &mut GUIState) {
+pub fn tick(game: &mut Game, gui_state: &mut GUIState) -> bool {
+    let mut need_restart = false;
     while game.time.start_update() {
         game.debug_lines.clear();
-        process_gui_command_queue(game, &mut gui_state.command_queue);
+        need_restart = process_gui_command_queue(game, &mut gui_state.command_queue);
         update_camera(game);
-        click_system(game);
-        dave_controller(game);
-        update_brainwash_target(game);
-        brainwash_system(game);
+        game_over_system(game);
+
+        if !game.game_over {
+            click_system(game);
+            dave_controller(game);
+            update_brainwash_target(game);
+            brainwash_system(game);
+            combat_system(game);
+            regen_system(game);
+        }
+
         target_indicator_system(game);
         viking_work_system(game);
-        update_viking_position(game);
+        update_viking_velocity(game);
         physics(game);
         beacons(game);
-        energy_regen_system(game);
+        update_position_system(game);
         transform_hierarchy_system(game);
     }
 
@@ -72,40 +82,52 @@ pub fn tick(game: &mut Game, gui_state: &mut GUIState) {
     if !RENDER_DEBUG_LINES {
         game.debug_lines.clear();
     }
+
+    need_restart
 }
 
-fn process_gui_command_queue(game: &mut Game, command_queue: &mut VecDeque<common::GUICommand>) {
-    let world = &mut game.world;
-    for command in command_queue.drain(..) {
-        println!("Processing command: {command:?}");
+fn process_gui_command_queue(game: &mut Game, command_queue: &mut VecDeque<GUICommand>) -> bool {
+    let world = &game.world;
+    let mut command_buffer = hecs::CommandBuffer::new();
+    let mut need_restart = false;
 
+    for command in command_queue.drain(..) {
         match command {
-            common::GUICommand::SetWorkerCount(place_of_work_entity, desired_worker_count) => {
+            GUICommand::SetWorkerCount(place_of_work_entity, desired_worker_count) => {
                 let mut place_of_work =
                     world.get::<&mut PlaceOfWork>(place_of_work_entity).unwrap();
                 let current_workers = place_of_work.workers.len();
                 if desired_worker_count > current_workers {
                     if let Some(worker_entity) = find_available_worker(world) {
                         place_of_work.workers.push_front(worker_entity);
-                        let mut worker = world.get::<&mut Viking>(worker_entity).unwrap();
-                        worker.assign_place_of_work(place_of_work_entity);
+                        command_buffer.insert_one(worker_entity, Job::new(place_of_work_entity));
                     }
                 } else {
                     if let Some(worker_entity) = place_of_work.workers.pop_back() {
-                        let mut worker = world.get::<&mut Viking>(worker_entity).unwrap();
-                        worker.unassign_work();
+                        command_buffer.remove_one::<Job>(worker_entity);
                     }
                 }
             }
-            common::GUICommand::Liquify(entity) => world.despawn(entity).unwrap(),
+            GUICommand::Liquify(entity) => command_buffer.despawn(entity),
+            GUICommand::Restart => {
+                need_restart = true;
+            }
         }
     }
+
+    game.run_command_buffer(command_buffer);
+
+    if need_restart {
+        *game = init_game();
+    }
+
+    need_restart
 }
 
 fn find_available_worker(world: &hecs::World) -> Option<hecs::Entity> {
     let mut query = world.query::<&Viking>();
     for (entity, viking) in query.iter() {
-        if viking.state == VikingState::AwaitingAssignment {
+        if viking.brainwash_state == BrainwashState::Brainwashed {
             return Some(entity);
         }
     }
@@ -128,6 +150,7 @@ pub struct Game {
     pub window_size: winit::dpi::PhysicalSize<u32>,
     pub debug_lines: Vec<Line>,
     pub last_ray: Option<Ray>,
+    pub game_over: bool,
 }
 
 impl Default for Game {
@@ -142,6 +165,7 @@ impl Default for Game {
             window_size: Default::default(),
             debug_lines: Default::default(),
             last_ray: None,
+            game_over: false,
         }
     }
 }
@@ -166,6 +190,29 @@ impl Game {
 
     pub fn dave(&self) -> RefMut<Dave> {
         self.world.get::<&mut Dave>(self.dave).unwrap()
+    }
+
+    pub fn command_buffer(&self) -> hecs::CommandBuffer {
+        hecs::CommandBuffer::new()
+    }
+
+    pub fn run_command_buffer(&mut self, mut command_buffer: hecs::CommandBuffer) {
+        command_buffer.run_on(&mut self.world);
+    }
+
+    pub fn get<'a, C: hecs::Component>(&'a self, entity: hecs::Entity) -> RefMut<'_, C> {
+        self.world.get::<&'a mut C>(entity).unwrap()
+    }
+}
+
+pub struct ECS<'a> {
+    pub world: &'a hecs::World,
+}
+
+impl ECS<'_> {
+    pub fn position_of(&self, entity: hecs::Entity) -> Vec3 {
+        let world = &self.world;
+        world.get::<&Transform>(entity).unwrap().position
     }
 }
 
@@ -284,11 +331,13 @@ fn set_camera_distance(input: &Input, camera: &mut Camera, dt: f32) {
 }
 
 fn update_gui_state(game: &mut Game, gui_state: &mut GUIState) {
+    gui_state.game_over = game.game_over;
     gui_state.idle_workers = game
         .world
         .query_mut::<&Viking>()
+        .without::<&Job>()
         .into_iter()
-        .filter(|(_, h)| h.state == VikingState::AwaitingAssignment)
+        .filter(|(_, h)| h.brainwash_state == BrainwashState::Brainwashed)
         .count();
 
     gui_state.paperclips = game
@@ -301,26 +350,30 @@ fn update_gui_state(game: &mut Game, gui_state: &mut GUIState) {
 
     {
         let dave = game.world.get::<&Dave>(game.dave).unwrap();
-        gui_state.bars.health_percentage = dave.health as f32 / MAX_HEALTH as f32;
+        let health = game.world.get::<&Health>(game.dave).unwrap();
+        gui_state.bars.health_percentage = health.value as f32 / MAX_HEALTH as f32;
         gui_state.bars.energy_percentage = dave.energy as f32 / MAX_ENERGY as f32;
     }
 
-    if let Some((entity, viking)) = game
+    if let Some((entity, (viking, job))) = game
         .world
-        .query::<&Viking>()
+        .query::<(&Viking, Option<&Job>)>()
         .with::<&Selected>()
         .iter()
         .next()
     {
-        let place_of_work = viking
-            .place_of_work
-            .map(|p| game.world.get::<&PlaceOfWork>(p).unwrap().place_type);
+        let place_of_work = job.map(|j| {
+            game.world
+                .get::<&PlaceOfWork>(j.place_of_work)
+                .unwrap()
+                .place_type
+        });
         gui_state.selected_item = Some((
             entity,
             SelectedItemInfo::Viking(VikingInfo {
                 inventory: format!("{:?}", viking.inventory),
                 name: "Boris".into(),
-                state: format!("{}", viking.state),
+                state: format!("{}", viking.brainwash_state),
                 place_of_work: format!("{place_of_work:?}"),
                 intelligence: viking.intelligence,
                 strength: viking.strength,

@@ -10,11 +10,15 @@ use common::{
     hecs::{self, Entity},
 };
 mod beacon;
+mod combat_state;
+mod job;
 mod transform;
 mod viking;
 pub use beacon::Beacon;
+pub use combat_state::CombatState;
+pub use job::{Job, JobState};
 pub use transform::Transform;
-pub use viking::{BrainwashState as VikingState, Viking};
+pub use viking::{BrainwashState, Viking};
 
 #[derive(Debug, Clone)]
 pub struct GLTFAsset {
@@ -49,16 +53,14 @@ pub struct Velocity {
 #[derive(Debug, Clone)]
 pub struct Dave {
     pub energy: usize,
-    pub health: usize,
     pub last_brainwash_time: Instant,
     pub last_energy_drain_time: Instant,
 }
 
 impl Dave {
-    pub fn new(energy: usize, health: usize) -> Self {
+    pub fn new(energy: usize) -> Self {
         Self {
             energy,
-            health,
             ..Default::default()
         }
     }
@@ -68,7 +70,6 @@ impl Default for Dave {
     fn default() -> Self {
         Self {
             energy: Default::default(),
-            health: Default::default(),
             last_brainwash_time: Instant::now(),
             last_energy_drain_time: Instant::now(),
         }
@@ -125,6 +126,14 @@ impl Task {
             Task::Gather => Resource::RawIron,
             Task::Smelt => Resource::Iron,
             Task::MakePaperclips => Resource::Paperclip,
+        }
+    }
+
+    pub const fn work_duration(&self) -> f32 {
+        match self {
+            Task::Gather => 8.,
+            Task::Smelt => 4.,
+            Task::MakePaperclips => 5.,
         }
     }
 }
@@ -275,4 +284,41 @@ pub struct Primitive {
 #[derive(Debug, Clone)]
 pub struct MaterialOverrides {
     pub base_colour_factor: Vec4,
+}
+
+#[derive(Debug, Clone)]
+pub struct Health {
+    pub value: usize,
+    pub last_taken_time: Instant,
+    pub last_regen_time: Instant,
+}
+
+impl Health {
+    pub fn new(value: usize) -> Self {
+        Self {
+            value,
+            last_taken_time: Instant::now(),
+            last_regen_time: Instant::now(),
+        }
+    }
+
+    pub fn take(&mut self, amount: usize) -> usize {
+        self.value = self.value.saturating_sub(amount);
+        self.last_taken_time = Instant::now();
+        self.value
+    }
+
+    pub fn add(&mut self, amount: usize) -> usize {
+        self.value = (self.value + amount).min(100);
+        self.last_taken_time = Instant::now();
+        self.value
+    }
+
+    pub fn time_since_last_taken(&self) -> f32 {
+        self.last_taken_time.elapsed().as_secs_f32()
+    }
+
+    pub fn time_since_last_regen(&self) -> f32 {
+        self.last_regen_time.elapsed().as_secs_f32()
+    }
 }

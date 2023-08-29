@@ -1,11 +1,10 @@
-use crate::config::{
-    AWAITING_ASSIGNMENT_COLOUR, BRAINWASH_TIME, FOLLOWING_COLOUR, FREE_COLOUR, WORKING_COLOUR,
-};
+use crate::config::{BRAINWASH_TIME, FOLLOWING_COLOUR, FREE_COLOUR};
 use crate::Game;
 use common::glam::Vec3;
 use common::hecs::{self, CommandBuffer};
 use components::{
-    GLTFAsset, MaterialOverrides, Parent, TargetIndicator, Targeted, Transform, Viking, VikingState,
+    BrainwashState, GLTFAsset, MaterialOverrides, Parent, TargetIndicator, Targeted, Transform,
+    Viking,
 };
 
 struct HasTargetEntity;
@@ -69,7 +68,8 @@ fn target_indicator_system_inner(world: &hecs::World, command_buffer: &mut Comma
         .iter()
     {
         let viking = world.get::<&Viking>(target_indicator.0).unwrap();
-        material_overrides.base_colour_factor = get_indicator_colour(&viking.state).extend(1.);
+        material_overrides.base_colour_factor =
+            get_indicator_colour(&viking.brainwash_state).extend(1.);
     }
 }
 
@@ -106,19 +106,13 @@ mod tests {
     }
 }
 
-pub fn get_indicator_colour(state: &VikingState) -> Vec3 {
+pub fn get_indicator_colour(state: &BrainwashState) -> Vec3 {
     match state {
-        VikingState::Free => FREE_COLOUR,
-        VikingState::BeingBrainwashed(amount) => {
+        BrainwashState::Free => FREE_COLOUR,
+        BrainwashState::BeingBrainwashed(amount) => {
             let brainwashed_percentage = *amount as f32 / BRAINWASH_TIME as f32;
             FREE_COLOUR.lerp(FOLLOWING_COLOUR, brainwashed_percentage)
         }
-        VikingState::Following => FOLLOWING_COLOUR,
-        VikingState::BecomingWorker(amount) => {
-            let brainwashed_percentage = *amount as f32 / BRAINWASH_TIME as f32;
-            FOLLOWING_COLOUR.lerp(AWAITING_ASSIGNMENT_COLOUR, brainwashed_percentage)
-        }
-        VikingState::AwaitingAssignment => AWAITING_ASSIGNMENT_COLOUR,
-        _ => WORKING_COLOUR,
+        BrainwashState::Brainwashed => FOLLOWING_COLOUR,
     }
 }

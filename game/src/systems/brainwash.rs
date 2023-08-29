@@ -1,6 +1,7 @@
 use std::time::Instant;
 
-use components::{Targeted, Viking, VikingState};
+use common::hecs::Or;
+use components::{BrainwashState, Job, Targeted, Viking};
 
 pub use crate::Game;
 use crate::{
@@ -16,18 +17,23 @@ pub fn brainwash_system(game: &mut Game) {
     let mut did_brainwash = false;
 
     // Find any targeted vikings
-    for (_, viking) in world.query::<&mut Viking>().with::<&Targeted>().iter() {
-        match &mut viking.state {
-            VikingState::Free => {
+    for (_, viking) in world
+        .query::<&mut Viking>()
+        .with::<&Targeted>()
+        .without::<&Job>()
+        .iter()
+    {
+        match &mut viking.brainwash_state {
+            BrainwashState::Free => {
                 // If we're holding down the brainwash key, start brainwashing them.
                 if is_brainwashing {
-                    viking.state = VikingState::BeingBrainwashed(0.);
+                    viking.brainwash_state = BrainwashState::BeingBrainwashed(0.);
                 }
             }
-            VikingState::BeingBrainwashed(amount) => {
+            BrainwashState::BeingBrainwashed(amount) => {
                 // If we're NOT holding down the brainwash key, set them free.
                 if !is_brainwashing {
-                    viking.state = VikingState::Free;
+                    viking.brainwash_state = BrainwashState::Free;
                     continue;
                 }
 
@@ -35,17 +41,16 @@ pub fn brainwash_system(game: &mut Game) {
                 did_brainwash = true;
 
                 if *amount >= BRAINWASH_TIME {
-                    viking.state = VikingState::Following;
+                    viking.brainwash_state = BrainwashState::Brainwashed;
                 }
             }
-            VikingState::Following => {
+            BrainwashState::Brainwashed => {
                 if !is_brainwashing {
-                    viking.state = VikingState::Free;
+                    viking.brainwash_state = BrainwashState::Free;
                     continue;
                 }
                 did_brainwash = true;
             }
-            _ => {}
         }
     }
 
@@ -56,10 +61,14 @@ pub fn brainwash_system(game: &mut Game) {
     }
 
     // Reset the brainwash state of any vikings who are no longer being targeted
-    for (_, viking) in world.query::<&mut Viking>().without::<&Targeted>().iter() {
-        match &mut viking.state {
-            VikingState::BeingBrainwashed(_) | VikingState::Following => {
-                viking.state = VikingState::Free;
+    for (_, viking) in world
+        .query::<&mut Viking>()
+        .without::<Or<&Targeted, &Job>>()
+        .iter()
+    {
+        match &mut viking.brainwash_state {
+            BrainwashState::BeingBrainwashed(_) | BrainwashState::Brainwashed => {
+                viking.brainwash_state = BrainwashState::Free;
             }
             _ => {}
         }

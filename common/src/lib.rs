@@ -101,6 +101,7 @@ impl Camera {
 
 #[derive(Debug, Clone, Default)]
 pub struct GUIState {
+    pub game_over: bool,
     pub paperclips: usize,
     pub idle_workers: usize,
     pub selected_item: Option<(Entity, SelectedItemInfo)>,
@@ -148,6 +149,7 @@ pub struct StorageInfo {
 
 pub trait Renderer {
     fn init(window: winit::window::Window) -> Self;
+    fn unload_assets(&mut self);
     fn update_assets(&mut self, world: &mut hecs::World);
     fn render(
         &mut self,
@@ -158,6 +160,7 @@ pub trait Renderer {
     );
     fn resized(&mut self, size: winit::dpi::PhysicalSize<u32>);
     fn cleanup(&mut self);
+    fn window(&'_ self) -> &'_ winit::window::Window;
 }
 
 pub struct Line {
@@ -176,4 +179,5 @@ impl Line {
 pub enum GUICommand {
     SetWorkerCount(Entity, usize),
     Liquify(Entity),
+    Restart,
 }

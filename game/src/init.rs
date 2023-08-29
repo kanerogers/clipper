@@ -8,8 +8,8 @@ use common::{
     Camera,
 };
 use components::{
-    Beacon, Collider, Dave, GLTFAsset, Info, Inventory, PlaceOfWork, Resource, Storage, Transform,
-    Velocity, Viking,
+    Beacon, Collider, Dave, GLTFAsset, Health, Info, Inventory, PlaceOfWork, Resource, Storage,
+    Transform, Velocity, Viking,
 };
 
 pub fn init_game() -> Game {
@@ -19,7 +19,8 @@ pub fn init_game() -> Game {
     // dave
     let dave = world.spawn((
         GLTFAsset::new("droid.glb"),
-        Dave::new(MAX_ENERGY, MAX_HEALTH),
+        Dave::new(MAX_ENERGY),
+        Health::new(MAX_HEALTH),
         Transform::from_position([0., 2., 0.].into()),
         Velocity::default(),
         Info::new("DAVE"),

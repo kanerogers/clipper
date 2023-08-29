@@ -110,11 +110,16 @@ fn window_tick<R: Renderer>(
     asset_loader: &mut asset_loader::AssetLoader,
 ) {
     game.time.start_frame();
-    game::tick(game, &mut gui.state);
+    let needs_restart = game::tick(game, &mut gui.state);
     asset_loader.load_assets(&mut game.world);
     game.input.camera_zoom = 0.;
     gui::draw_gui(gui);
 
+    if needs_restart {
+        println!("Game needs restart!");
+        renderer.unload_assets();
+        game.resized(renderer.window().inner_size());
+    }
     renderer.update_assets(&mut game.world);
     renderer.render(&game.world, &game.debug_lines, game.camera, &mut gui.yak);
 }
