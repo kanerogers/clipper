@@ -1,9 +1,10 @@
-use crate::config::{BRAINWASH_TIME, FOLLOWING_COLOUR, FREE_COLOUR, WORKING_COLOUR};
+use crate::config::{BRAINWASH_TIME, FOLLOWING_COLOUR, FREE_COLOUR};
 use crate::Game;
 use common::glam::Vec3;
 use common::hecs::{self, CommandBuffer};
 use components::{
-    GLTFAsset, MaterialOverrides, Parent, TargetIndicator, Targeted, Transform, Viking, VikingState,
+    BrainwashState, GLTFAsset, MaterialOverrides, Parent, TargetIndicator, Targeted, Transform,
+    Viking,
 };
 
 struct HasTargetEntity;
@@ -105,13 +106,13 @@ mod tests {
     }
 }
 
-pub fn get_indicator_colour(state: &VikingState) -> Vec3 {
+pub fn get_indicator_colour(state: &BrainwashState) -> Vec3 {
     match state {
-        VikingState::Free => FREE_COLOUR,
-        VikingState::BeingBrainwashed(amount) => {
+        BrainwashState::Free => FREE_COLOUR,
+        BrainwashState::BeingBrainwashed(amount) => {
             let brainwashed_percentage = *amount as f32 / BRAINWASH_TIME as f32;
             FREE_COLOUR.lerp(FOLLOWING_COLOUR, brainwashed_percentage)
         }
-        VikingState::Brainwashed => WORKING_COLOUR,
+        BrainwashState::Brainwashed => FOLLOWING_COLOUR,
     }
 }

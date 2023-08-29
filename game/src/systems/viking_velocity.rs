@@ -1,29 +1,44 @@
 use std::time::Instant;
 
 use crate::{config::VIKING_MOVE_SPEED, Game};
-use common::{glam::Vec3, rand};
-use components::{Job, Transform, Velocity, Viking, VikingState};
+use common::{glam::Vec3, hecs::Or, rand};
+use components::{BrainwashState, CombatState, Job, Transform, Velocity, Viking};
 use rand::Rng;
 
 pub fn update_viking_velocity(game: &mut Game) {
+    // Update velocity for Vikings in combat
+    update_vikings_in_combat(game);
+
     // Update velocity for Vikings with jobs
     update_vikings_with_jobs(game);
 
-    // Update velocity for Vikings WITHOUT jobs
-    update_vikings_without_jobs(game);
+    // Update velocity for Vikings WITHOUT jobs who are NOT in combat
+    update_vikings_without_jobs_or_combat(game);
 }
 
-fn update_vikings_without_jobs(game: &mut Game) {
+fn update_vikings_in_combat(game: &mut Game) {
     let world = &game.world;
-    let dave_position = world.get::<&Transform>(game.dave).unwrap().position;
+
+    for (_, (velocity, transform, combat_state)) in world
+        .query::<(&mut Velocity, &Transform, &CombatState)>()
+        .iter()
+    {
+        let target_position = game.position_of(combat_state.target);
+        velocity.linear = (target_position - transform.position) * VIKING_MOVE_SPEED;
+    }
+}
+
+fn update_vikings_without_jobs_or_combat(game: &mut Game) {
+    let world = &game.world;
+    let dave_position = game.dave_position();
 
     for (_, (viking, velocity, transform)) in world
         .query::<(&mut Viking, &mut Velocity, &Transform)>()
-        .without::<&Job>()
+        .without::<Or<&Job, &CombatState>>()
         .iter()
     {
         velocity.linear = match viking.brainwash_state {
-            VikingState::Free | VikingState::BeingBrainwashed(_) => {
+            BrainwashState::Free | BrainwashState::BeingBrainwashed(_) => {
                 if viking.last_update.elapsed().as_secs_f32() > 1.0 {
                     viking.last_update = Instant::now();
                     random_movement()
@@ -31,7 +46,7 @@ fn update_vikings_without_jobs(game: &mut Game) {
                     continue;
                 }
             }
-            VikingState::Brainwashed => {
+            BrainwashState::Brainwashed => {
                 (dave_position - transform.position).normalize() * VIKING_MOVE_SPEED
             }
         };

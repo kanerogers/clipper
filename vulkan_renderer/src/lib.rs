@@ -127,6 +127,17 @@ impl Renderer for LazyVulkan {
         let vulkan_context = &self.context;
         self.renderer.update_assets(vulkan_context, world);
     }
+
+    fn unload_assets(&mut self) {
+        let vulkan_context = &self.context;
+        unsafe {
+            self.renderer.unload_assets(vulkan_context);
+        }
+    }
+
+    fn window(&'_ self) -> &'_ winit::window::Window {
+        &self.window
+    }
 }
 
 impl LazyVulkan {

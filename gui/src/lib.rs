@@ -51,6 +51,12 @@ pub fn draw_gui(gui: &mut GUI) {
     let idle_worker_count = gui_state.idle_workers;
     let commands = &mut gui_state.command_queue;
 
+    if gui_state.game_over {
+        game_over(paperclip_count, commands);
+        gui.yak.finish();
+        return;
+    }
+
     row(|| {
         colored_box_container(Color::rgba(0, 0, 0, 200), || {
             let mut col = widgets::List::column();
@@ -74,6 +80,33 @@ pub fn draw_gui(gui: &mut GUI) {
     });
     bars(&gui_state.bars);
     gui.yak.finish();
+}
+
+fn game_over(paperclip_count: usize, commands: &mut VecDeque<GUICommand>) {
+    let mut the_box = List::column();
+    the_box.main_axis_alignment = MainAxisAlignment::Center;
+    the_box.cross_axis_alignment = CrossAxisAlignment::Center;
+
+    the_box.show(|| {
+        let container = widgets::ColoredBox::container(Color::rgba(0, 0, 0, 200));
+        container.show_children(|| {
+            pad(Pad::balanced(20., 10.), || {
+                let mut column = List::column();
+                column.main_axis_size = MainAxisSize::Min;
+                column.main_axis_alignment = MainAxisAlignment::Center;
+                column.cross_axis_alignment = CrossAxisAlignment::Center;
+                column.show(|| {
+                    text(100., "GAME OVER");
+                    text(50., format!("You made {paperclip_count} paperclips."));
+                    text(50., format!("You maintained AI safety."));
+                    let res = button("Try again");
+                    if res.clicked {
+                        commands.push_back(GUICommand::Restart);
+                    }
+                });
+            });
+        });
+    });
 }
 
 fn bars(bar_state: &BarState) {

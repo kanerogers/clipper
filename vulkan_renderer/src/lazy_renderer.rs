@@ -472,10 +472,11 @@ impl LazyRenderer {
     ) -> u32 {
         let texture =
             VulkanTexture::new(vulkan_context, &mut self.descriptors, texture_create_info);
+        let texture_id = texture.id;
 
         // TODO: do we even care about doing this, beyond cleanup?
-        // self.user_textures.insert(texture);
-        texture.id
+        self.user_textures.insert(texture);
+        texture_id
     }
 
     /// Clean up all Vulkan related handles on this instance. You'll probably want to call this when the program ends, but
@@ -601,6 +602,26 @@ impl LazyRenderer {
             }
         }
         draw_calls
+    }
+
+    pub(crate) unsafe fn unload_assets(&mut self, vulkan_context: &VulkanContext) {
+        let device = &vulkan_context.device;
+        device.queue_wait_idle(vulkan_context.queue).unwrap();
+        // OKIEDOKIE. We'll need to:
+        // empty the geometry buffers
+        self.geometry_buffers.cleanup(device);
+        self.geometry_buffers = GeometryBuffers::new(vulkan_context);
+        // empty the materials
+        self.materials = Default::default();
+
+        // empty the textures
+        for (_, texture) in self.user_textures.drain() {
+            texture.cleanup(device);
+        }
+
+        // empty the descriptors
+        self.descriptors.cleanup(device);
+        self.descriptors = Descriptors::new(vulkan_context);
     }
 }
 

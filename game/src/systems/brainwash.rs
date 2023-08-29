@@ -1,7 +1,7 @@
 use std::time::Instant;
 
 use common::hecs::Or;
-use components::{Job, Targeted, Viking, VikingState};
+use components::{BrainwashState, Job, Targeted, Viking};
 
 pub use crate::Game;
 use crate::{
@@ -24,16 +24,16 @@ pub fn brainwash_system(game: &mut Game) {
         .iter()
     {
         match &mut viking.brainwash_state {
-            VikingState::Free => {
+            BrainwashState::Free => {
                 // If we're holding down the brainwash key, start brainwashing them.
                 if is_brainwashing {
-                    viking.brainwash_state = VikingState::BeingBrainwashed(0.);
+                    viking.brainwash_state = BrainwashState::BeingBrainwashed(0.);
                 }
             }
-            VikingState::BeingBrainwashed(amount) => {
+            BrainwashState::BeingBrainwashed(amount) => {
                 // If we're NOT holding down the brainwash key, set them free.
                 if !is_brainwashing {
-                    viking.brainwash_state = VikingState::Free;
+                    viking.brainwash_state = BrainwashState::Free;
                     continue;
                 }
 
@@ -41,12 +41,12 @@ pub fn brainwash_system(game: &mut Game) {
                 did_brainwash = true;
 
                 if *amount >= BRAINWASH_TIME {
-                    viking.brainwash_state = VikingState::Brainwashed;
+                    viking.brainwash_state = BrainwashState::Brainwashed;
                 }
             }
-            VikingState::Brainwashed => {
+            BrainwashState::Brainwashed => {
                 if !is_brainwashing {
-                    viking.brainwash_state = VikingState::Free;
+                    viking.brainwash_state = BrainwashState::Free;
                     continue;
                 }
                 did_brainwash = true;
@@ -67,8 +67,8 @@ pub fn brainwash_system(game: &mut Game) {
         .iter()
     {
         match &mut viking.brainwash_state {
-            VikingState::BeingBrainwashed(_) | VikingState::Brainwashed => {
-                viking.brainwash_state = VikingState::Free;
+            BrainwashState::BeingBrainwashed(_) | BrainwashState::Brainwashed => {
+                viking.brainwash_state = BrainwashState::Free;
             }
             _ => {}
         }
