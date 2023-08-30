@@ -1,19 +1,22 @@
+mod bottom_bar;
+
+use crate::bottom_bar::bottom_bar;
 use std::collections::VecDeque;
 
 pub use common::GUIState;
 use common::{
     hecs,
     yakui::{
-        self, button, pad,
+        self, button, colored_box_container, column, expanded,
+        font::{Font, FontSettings, Fonts},
+        geometry::Rect,
+        pad, row, text, widgets,
         widgets::{List, Pad},
-        CrossAxisAlignment, MainAxisAlignment,
+        Color, CrossAxisAlignment, MainAxisAlignment, MainAxisSize,
     },
-    BarState, GUICommand, PlaceOfWorkInfo, VikingInfo,
+    GUICommand, PlaceOfWorkInfo, VikingInfo,
 };
-pub use yakui::geometry::Rect;
-use yakui::{
-    colored_box, colored_box_container, column, expanded, row, text, widgets, Color, MainAxisSize,
-};
+
 pub struct GUI {
     pub yak: yakui::Yakui,
     pub state: GUIState,
@@ -27,6 +30,16 @@ impl GUI {
             Default::default(),
             [width as f32, height as f32].into(),
         ));
+
+        let fonts = yak.dom().get_global_or_init(Fonts::default);
+
+        let fontawesome = Font::from_bytes(
+            include_bytes!("../../assets/fonts/font_awesome.otf").as_slice(),
+            FontSettings::default(),
+        )
+        .unwrap();
+        fonts.add(fontawesome, Some("fontawesome"));
+
         GUI {
             yak,
             state: Default::default(),
@@ -47,23 +60,33 @@ impl GUI {
 pub fn draw_gui(gui: &mut GUI) {
     let gui_state = &mut gui.state;
     gui.yak.start();
-    let paperclip_count = gui_state.paperclips;
-    let idle_worker_count = gui_state.idle_workers;
     let commands = &mut gui_state.command_queue;
 
     if gui_state.game_over {
-        game_over(paperclip_count, commands);
+        game_over(gui_state.paperclips, commands);
         gui.yak.finish();
         return;
     }
 
+    inspectors(gui_state);
+    bottom_bar(gui_state);
+    gui.yak.finish();
+}
+
+fn inspectors(gui_state: &mut GUIState) {
+    let GUIState {
+        paperclips,
+        idle_workers,
+        command_queue,
+        ..
+    } = gui_state;
     row(|| {
         colored_box_container(Color::rgba(0, 0, 0, 200), || {
             let mut col = widgets::List::column();
             col.main_axis_size = MainAxisSize::Min;
             col.show(|| {
-                text(30., format!("Idle Workers: {idle_worker_count}"));
-                text(30., format!("Paperclips: {paperclip_count}"));
+                text(30., format!("Idle Workers: {idle_workers}"));
+                text(30., format!("Paperclips: {paperclips}"));
             });
         });
         expanded(|| {});
@@ -72,14 +95,14 @@ pub fn draw_gui(gui: &mut GUI) {
             let mut container = widgets::ColoredBox::container(Color::rgba(0, 0, 0, 200));
             container.min_size.x = 200.;
             container.show_children(|| match selected_item {
-                common::SelectedItemInfo::Viking(h) => viking(*entity, h, commands),
-                common::SelectedItemInfo::PlaceOfWork(p) => place_of_work(*entity, p, commands),
+                common::SelectedItemInfo::Viking(h) => viking(*entity, h, command_queue),
+                common::SelectedItemInfo::PlaceOfWork(p) => {
+                    place_of_work(*entity, p, command_queue)
+                }
                 common::SelectedItemInfo::Storage(s) => storage(s),
             });
         }
     });
-    bars(&gui_state.bars);
-    gui.yak.finish();
 }
 
 fn game_over(paperclip_count: usize, commands: &mut VecDeque<GUICommand>) {
@@ -106,40 +129,6 @@ fn game_over(paperclip_count: usize, commands: &mut VecDeque<GUICommand>) {
                 });
             });
         });
-    });
-}
-
-fn bars(bar_state: &BarState) {
-    let mut bars = List::row();
-    bars.main_axis_alignment = MainAxisAlignment::Center;
-    bars.cross_axis_alignment = CrossAxisAlignment::End;
-
-    bars.show(|| {
-        let mut container = widgets::ColoredBox::container(Color::rgba(0, 0, 0, 200));
-        container.min_size = [200., 20.].into();
-        container.show_children(|| {
-            pad(Pad::balanced(20., 10.), || {
-                let mut column = List::column();
-                column.main_axis_size = MainAxisSize::Min;
-                column.main_axis_alignment = MainAxisAlignment::End;
-                column.cross_axis_alignment = CrossAxisAlignment::Start;
-                column.show(|| {
-                    bar("Health", Color::RED, bar_state.health_percentage);
-                    bar("Energy", Color::BLUE, bar_state.energy_percentage);
-                });
-            });
-        });
-    });
-}
-
-fn bar(label: &'static str, colour: Color, percentage: f32) {
-    let mut row = List::row();
-    row.main_axis_alignment = MainAxisAlignment::Start;
-    row.item_spacing = 10.;
-    row.cross_axis_alignment = CrossAxisAlignment::Center;
-    row.show(|| {
-        text(14., label);
-        colored_box(colour, [100. * percentage, 10.]);
     });
 }
 
