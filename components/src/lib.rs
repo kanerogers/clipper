@@ -310,7 +310,7 @@ impl Health {
 
     pub fn add(&mut self, amount: usize) -> usize {
         self.value = (self.value + amount).min(100);
-        self.last_taken_time = Instant::now();
+        self.last_regen_time = Instant::now();
         self.value
     }
 
