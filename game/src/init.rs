@@ -73,26 +73,6 @@ pub fn init_game() -> Game {
         Info::new("Mine"),
     ));
 
-    // forge
-    world.spawn((
-        Collider::default(),
-        GLTFAsset::new("forge.glb"),
-        Transform::from_position([-30., 0.0, 0.0].into()),
-        PlaceOfWork::forge(),
-        Inventory::new([]),
-        Info::new("Forge"),
-    ));
-
-    // factory
-    world.spawn((
-        Collider::default(),
-        GLTFAsset::new("factory.glb"),
-        Transform::from_position([20., 0.0, 30.0].into()),
-        PlaceOfWork::factory(),
-        Inventory::new([]),
-        Info::new("Factory"),
-    ));
-
     camera.position.y = 3.;
     camera.position.z = 12.;
     camera.distance = 50.;

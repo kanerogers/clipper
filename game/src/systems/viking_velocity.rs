@@ -54,22 +54,25 @@ fn update_vikings_without_jobs_or_combat(game: &mut Game) {
 }
 
 fn update_vikings_with_jobs(game: &mut Game) {
+    use components::JobState::*;
     let world = &game.world;
     for (_, (velocity, job, transform)) in world
         .query::<(&mut Velocity, &Job, &Transform)>()
         .with::<&Viking>()
         .iter()
     {
-        let destination = match job.state {
-            components::JobState::GoingToPlaceOfWork => game.position_of(job.place_of_work),
-            components::JobState::DroppingOffResource(destination) => game.position_of(destination),
-            _ => {
-                velocity.linear = Vec3::ZERO;
-                continue;
+        if let Some(destination) = match job.state {
+            GoingToPlaceOfWork => Some(game.position_of(job.place_of_work)),
+            DroppingOffResource(_, destination) | FetchingResource(_, destination) => {
+                Some(game.position_of(destination))
             }
-        };
+            Working(_) | Constructing => None,
+        } {
+            velocity.linear = (destination - transform.position).normalize() * VIKING_MOVE_SPEED
+        } else {
+            velocity.linear = Default::default();
+        }
 
-        velocity.linear = (destination - transform.position).normalize() * VIKING_MOVE_SPEED
     }
 }
 

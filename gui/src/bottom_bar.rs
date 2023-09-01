@@ -7,7 +7,7 @@ use common::{
         widgets::{List, Pad},
         Color, CrossAxisAlignment, MainAxisAlignment, MainAxisSize, Response,
     },
-    BarState, GUIState, BUILDING_TYPE_FACTORY, BUILDING_TYPE_FORGE, BUILDING_TYPE_MINE, GUICommand,
+    BarState, GUICommand, GUIState, BUILDING_TYPE_FACTORY, BUILDING_TYPE_FORGE,
 };
 
 pub fn bottom_bar(gui_state: &mut GUIState) {
@@ -69,9 +69,6 @@ fn build_icons(commands: &mut VecDeque<GUICommand>) {
 
     let mut icon_clicked = None;
     row.show(|| {
-        if icon_button(MINE).clicked {
-            icon_clicked = Some(BUILDING_TYPE_MINE);
-        }
         if icon_button(FORGE).clicked {
             icon_clicked = Some(BUILDING_TYPE_FORGE);
         }
@@ -106,6 +103,5 @@ fn icon_button(icon_codepoint: &'static str) -> Response<ButtonWidget> {
 
 pub const HEART: &str = "\u{f004}";
 pub const BOLT: &str = "\u{f0e7}";
-pub const MINE: &str = "\u{f2e5}";
 pub const FORGE: &str = "\u{f06d}";
 pub const FACTORY: &str = "\u{f275}";

@@ -11,11 +11,12 @@ use common::{
     rapier3d::prelude::Ray,
     winit::{self},
     Camera, GUICommand, GUIState, Line, PlaceOfWorkInfo, SelectedItemInfo, VikingInfo,
-    BUILDING_TYPE_FACTORY, BUILDING_TYPE_FORGE, BUILDING_TYPE_MINE,
+    BUILDING_TYPE_FACTORY, BUILDING_TYPE_FORGE,
 };
 use components::{
-    BrainwashState, BuildingGhost, Collider, Dave, GLTFAsset, Health, Inventory, Job,
-    MaterialOverrides, PlaceOfWork, Resource, Selected, Storage, Transform, Viking, WorkplaceType,
+    BrainwashState, BuildingGhost, Collider, Dave, GLTFAsset, Health, Inventory, Job, JobState,
+    MaterialOverrides, PlaceOfWork, Resource, Selected, Storage, Task, Transform, Viking,
+    WorkplaceType, ConstructionSite,
 };
 use config::{BUILDING_TRANSPARENCY, MAX_ENERGY, MAX_HEALTH};
 use init::init_game;
@@ -99,19 +100,12 @@ fn process_gui_command_queue(game: &mut Game, command_queue: &mut VecDeque<GUICo
     for command in command_queue.drain(..) {
         match command {
             GUICommand::SetWorkerCount(place_of_work_entity, desired_worker_count) => {
-                let mut place_of_work =
-                    world.get::<&mut PlaceOfWork>(place_of_work_entity).unwrap();
-                let current_workers = place_of_work.workers.len();
-                if desired_worker_count > current_workers {
-                    if let Some(worker_entity) = find_available_worker(world) {
-                        place_of_work.workers.push_front(worker_entity);
-                        command_buffer.insert_one(worker_entity, Job::new(place_of_work_entity));
-                    }
-                } else {
-                    if let Some(worker_entity) = place_of_work.workers.pop_back() {
-                        command_buffer.remove_one::<Job>(worker_entity);
-                    }
-                }
+                set_worker_count(
+                    world,
+                    place_of_work_entity,
+                    desired_worker_count,
+                    &mut command_buffer,
+                );
             }
             GUICommand::Liquify(entity) => command_buffer.despawn(entity),
             GUICommand::Restart => {
@@ -132,6 +126,34 @@ fn process_gui_command_queue(game: &mut Game, command_queue: &mut VecDeque<GUICo
     need_restart
 }
 
+fn set_worker_count(
+    world: &hecs::World,
+    place_of_work_entity: hecs::Entity,
+    desired_worker_count: usize,
+    command_buffer: &mut hecs::CommandBuffer,
+) {
+    let mut place_of_work = world.get::<&mut PlaceOfWork>(place_of_work_entity).unwrap();
+    let current_workers = place_of_work.workers.len();
+    if desired_worker_count > current_workers {
+        if let Some(worker_entity) = find_available_worker(world) {
+            place_of_work.workers.push_front(worker_entity);
+            let mut job = Job::new(place_of_work_entity);
+
+            // TODO: this is inelegant
+            if place_of_work.task == Task::Construction {
+                let storage = world.query::<&Storage>().iter().next().unwrap().0;
+                let construction_site = world.get::<&ConstructionSite>(place_of_work_entity).unwrap();
+                job.state = JobState::FetchingResource(construction_site.resources_required().1, storage);
+            }
+            command_buffer.insert_one(worker_entity, job);
+        }
+    } else {
+        if let Some(worker_entity) = place_of_work.workers.pop_back() {
+            command_buffer.remove_one::<Job>(worker_entity);
+        }
+    }
+}
+
 fn show_ghost_building(
     building_name: &str,
     world: &hecs::World,
@@ -140,7 +162,6 @@ fn show_ghost_building(
     let (building_type, asset_name) = match building_name {
         BUILDING_TYPE_FACTORY => (WorkplaceType::Factory, "factory.glb"),
         BUILDING_TYPE_FORGE => (WorkplaceType::Forge, "forge.glb"),
-        BUILDING_TYPE_MINE => (WorkplaceType::Mine, "mine.glb"),
         _ => {
             log::error!("Attempted to build unknown building type {building_name}");
             return;
@@ -241,6 +262,16 @@ impl Game {
 
     pub fn get<'a, C: hecs::Component>(&'a self, entity: hecs::Entity) -> RefMut<'_, C> {
         self.world.get::<&'a mut C>(entity).unwrap()
+    }
+
+    pub fn storage(&self) -> hecs::Entity {
+        self.world
+            .query::<()>()
+            .with::<&Storage>()
+            .iter()
+            .next()
+            .unwrap()
+            .0
     }
 }
 
