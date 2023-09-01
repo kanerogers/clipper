@@ -7,19 +7,22 @@ use common::{
     bitflags::bitflags,
     glam::{Quat, Vec2, Vec3},
     hecs::{self, RefMut},
+    log,
     rapier3d::prelude::Ray,
     winit::{self},
     Camera, GUICommand, GUIState, Line, PlaceOfWorkInfo, SelectedItemInfo, VikingInfo,
+    BUILDING_TYPE_FACTORY, BUILDING_TYPE_FORGE, BUILDING_TYPE_MINE,
 };
 use components::{
-    BrainwashState, Dave, Health, Inventory, Job, PlaceOfWork, Resource, Selected, Storage,
-    Transform, Viking,
+    BrainwashState, BuildingGhost, Dave, GLTFAsset, Health, Inventory, Job, MaterialOverrides,
+    PlaceOfWork, Resource, Selected, Storage, Transform, Viking, WorkplaceType,
 };
-use config::{MAX_ENERGY, MAX_HEALTH};
+use config::{BUILDING_TRANSPARENCY, MAX_ENERGY, MAX_HEALTH};
 use init::init_game;
 use std::collections::VecDeque;
 use systems::{
-    beacons, brainwash::brainwash_system, click_system, combat::combat_system, dave_controller,
+    beacons, brainwash::brainwash_system, click_system, combat::combat_system,
+    construction::construction_system, dave_controller,
     find_brainwash_target::update_brainwash_target, from_na, game_over::game_over_system, physics,
     regen::regen_system, target_indicator::target_indicator_system,
     transform_hierarchy::transform_hierarchy_system, update_position::update_position_system,
@@ -54,6 +57,7 @@ pub fn tick(game: &mut Game, gui_state: &mut GUIState) -> bool {
             brainwash_system(game);
             combat_system(game);
             regen_system(game);
+            construction_system(game);
         }
 
         target_indicator_system(game);
@@ -63,6 +67,7 @@ pub fn tick(game: &mut Game, gui_state: &mut GUIState) -> bool {
         beacons(game);
         update_position_system(game);
         transform_hierarchy_system(game);
+        reset_mouse_clicks(&mut game.input.mouse_state);
     }
 
     update_gui_state(game, gui_state);
@@ -112,6 +117,9 @@ fn process_gui_command_queue(game: &mut Game, command_queue: &mut VecDeque<GUICo
             GUICommand::Restart => {
                 need_restart = true;
             }
+            GUICommand::ConstructBuilding(building_name) => {
+                show_ghost_building(building_name, world, &mut command_buffer);
+            }
         }
     }
 
@@ -122,6 +130,36 @@ fn process_gui_command_queue(game: &mut Game, command_queue: &mut VecDeque<GUICo
     }
 
     need_restart
+}
+
+fn show_ghost_building(
+    building_name: &str,
+    world: &hecs::World,
+    command_buffer: &mut hecs::CommandBuffer,
+) {
+    let (building_type, asset_name) = match building_name {
+        BUILDING_TYPE_FACTORY => (WorkplaceType::Factory, "factory.glb"),
+        BUILDING_TYPE_FORGE => (WorkplaceType::Forge, "forge.glb"),
+        BUILDING_TYPE_MINE => (WorkplaceType::Mine, "mine.glb"),
+        _ => {
+            log::error!("Attempted to build unknown building type {building_name}");
+            return;
+        }
+    };
+
+    // Remove any existing ghosts
+    for (entity, _) in world.query::<()>().with::<&BuildingGhost>().iter() {
+        command_buffer.despawn(entity);
+    }
+
+    command_buffer.spawn((
+        BuildingGhost::new(building_type),
+        GLTFAsset::new(asset_name),
+        Transform::default(),
+        MaterialOverrides {
+            base_colour_factor: [1., 1., 1., BUILDING_TRANSPARENCY].into(),
+        },
+    ));
 }
 
 fn find_available_worker(world: &hecs::World) -> Option<hecs::Entity> {
@@ -425,4 +463,19 @@ fn update_gui_state(game: &mut Game, gui_state: &mut GUIState) {
 
     // nothing was selected!
     gui_state.selected_item = None;
+}
+
+fn reset_mouse_clicks(mouse_state: &mut crate::MouseState) {
+    match mouse_state.left_click_state {
+        ClickState::JustReleased => mouse_state.left_click_state = ClickState::Released,
+        _ => {}
+    };
+    match mouse_state.right_click_state {
+        ClickState::JustReleased => mouse_state.right_click_state = ClickState::Released,
+        _ => {}
+    };
+    match mouse_state.middle_click_state {
+        ClickState::JustReleased => mouse_state.middle_click_state = ClickState::Released,
+        _ => {}
+    };
 }

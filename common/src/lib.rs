@@ -180,4 +180,9 @@ pub enum GUICommand {
     SetWorkerCount(Entity, usize),
     Liquify(Entity),
     Restart,
+    ConstructBuilding(&'static str), // this is awful
 }
+
+pub const BUILDING_TYPE_MINE: &str = "mine";
+pub const BUILDING_TYPE_FORGE: &str = "forge";
+pub const BUILDING_TYPE_FACTORY: &str = "factory";

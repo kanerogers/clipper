@@ -86,8 +86,8 @@ pub enum Resource {
 impl Resource {
     pub const fn destination(&self) -> ResourceDestination {
         match self {
-            Resource::RawIron => ResourceDestination::PlaceOfWork(PlaceType::Forge),
-            Resource::Iron => ResourceDestination::PlaceOfWork(PlaceType::Factory),
+            Resource::RawIron => ResourceDestination::PlaceOfWork(WorkplaceType::Forge),
+            Resource::Iron => ResourceDestination::PlaceOfWork(WorkplaceType::Factory),
             Resource::Paperclip => ResourceDestination::Storage,
         }
     }
@@ -95,7 +95,7 @@ impl Resource {
 
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord, Hash)]
 pub enum ResourceDestination {
-    PlaceOfWork(PlaceType),
+    PlaceOfWork(WorkplaceType),
     Storage,
 }
 
@@ -140,7 +140,7 @@ impl Task {
 
 #[derive(Debug, Clone)]
 pub struct PlaceOfWork {
-    pub place_type: PlaceType,
+    pub place_type: WorkplaceType,
     pub task: Task,
     pub worker_capacity: usize,
     pub workers: VecDeque<hecs::Entity>,
@@ -149,7 +149,7 @@ pub struct PlaceOfWork {
 impl PlaceOfWork {
     pub fn mine() -> PlaceOfWork {
         PlaceOfWork {
-            place_type: PlaceType::Mine,
+            place_type: WorkplaceType::Mine,
             task: Task::Gather,
             worker_capacity: 5,
             workers: Default::default(),
@@ -158,7 +158,7 @@ impl PlaceOfWork {
 
     pub fn forge() -> PlaceOfWork {
         PlaceOfWork {
-            place_type: PlaceType::Forge,
+            place_type: WorkplaceType::Forge,
             task: Task::Smelt,
             worker_capacity: 2,
             workers: Default::default(),
@@ -167,7 +167,7 @@ impl PlaceOfWork {
 
     pub fn factory() -> PlaceOfWork {
         PlaceOfWork {
-            place_type: PlaceType::Factory,
+            place_type: WorkplaceType::Factory,
             task: Task::MakePaperclips,
             worker_capacity: 1,
             workers: Default::default(),
@@ -175,8 +175,19 @@ impl PlaceOfWork {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct BuildingGhost {
+    pub workplace_type: WorkplaceType,
+}
+
+impl BuildingGhost {
+    pub fn new(workplace_type: WorkplaceType) -> Self {
+        Self { workplace_type }
+    }
+}
+
 #[derive(Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Hash)]
-pub enum PlaceType {
+pub enum WorkplaceType {
     Mine,
     Forge,
     Factory,

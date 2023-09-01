@@ -73,6 +73,6 @@ void main() {
         base_colour = base_colour_factor * texture(textures[base_colour_texture_id], in_uv);
     } 
     
-    vec3 shaded = blinn_phong(base_colour.xyz);
-    out_colour = vec4(aces(shaded), 1.0);
+    vec3 shaded = blinn_phong(base_colour.rgb);
+    out_colour = vec4(aces(shaded), base_colour.a);
 }
