@@ -85,6 +85,25 @@ impl PhysicsContext {
             &self.narrow_phase,
         );
     }
+
+    /// Quick and dirty. Is this entity intersecting with any others?
+    pub(crate) fn check_for_intersections(
+        &self,
+        entity: hecs::Entity,
+        world: &hecs::World,
+    ) -> bool {
+        let Ok(handle) = world.get::<&ColliderHandle>(entity) else { 
+            log::warn!("Attempted to check for intersections for entity that has no collider: {entity:?}");
+            return false 
+        };
+        for (_, _, intersecting) in self.narrow_phase.intersections_with(*handle) {
+            if intersecting {
+                return true;
+            }
+        }
+
+        false
+    }
 }
 
 pub fn physics(game: &mut Game) {
@@ -146,7 +165,7 @@ fn create_missing_collider_handles(game: &mut Game) {
 
     for (entity, (collider_info, info, transform, model)) in game
         .world
-        .query::<(&mut Collider, &Info, &Transform, &GLTFModel)>()
+        .query::<(&mut Collider, Option<&Info>, &Transform, &GLTFModel)>()
         .without::<&ColliderHandle>()
         .iter()
     {
@@ -163,7 +182,7 @@ fn create_missing_collider_handles(game: &mut Game) {
 
         log::info!(
             "Created collider for {} - {:?}",
-            info.name,
+            info.as_ref().map(|i| &i.name).unwrap_or(&format!("{:?}", entity)),
             collider.position
         );
 

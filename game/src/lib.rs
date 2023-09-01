@@ -14,8 +14,8 @@ use common::{
     BUILDING_TYPE_FACTORY, BUILDING_TYPE_FORGE, BUILDING_TYPE_MINE,
 };
 use components::{
-    BrainwashState, BuildingGhost, Dave, GLTFAsset, Health, Inventory, Job, MaterialOverrides,
-    PlaceOfWork, Resource, Selected, Storage, Transform, Viking, WorkplaceType,
+    BrainwashState, BuildingGhost, Collider, Dave, GLTFAsset, Health, Inventory, Job,
+    MaterialOverrides, PlaceOfWork, Resource, Selected, Storage, Transform, Viking, WorkplaceType,
 };
 use config::{BUILDING_TRANSPARENCY, MAX_ENERGY, MAX_HEALTH};
 use init::init_game;
@@ -156,6 +156,7 @@ fn show_ghost_building(
         BuildingGhost::new(building_type),
         GLTFAsset::new(asset_name),
         Transform::default(),
+        Collider::default(),
         MaterialOverrides {
             base_colour_factor: [1., 1., 1., BUILDING_TRANSPARENCY].into(),
         },
