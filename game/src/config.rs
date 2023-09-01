@@ -15,3 +15,4 @@ pub const VIKING_ATTACK_DAMAGE: usize = 5;
 pub const COMBAT_RANGE: f32 = 1.;
 pub const HEALTH_REGEN_RATE: f32 = 0.01;
 pub const BUILDING_TRANSPARENCY: f32 = 0.5;
+pub const CONSTRUCTION_TIME: f32 = 10.;

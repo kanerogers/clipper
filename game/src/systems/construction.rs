@@ -1,28 +1,73 @@
 use super::from_na;
 use common::{hecs, log};
-use components::{BuildingGhost, ConstructionSite, MaterialOverrides, Transform};
+use components::{
+    BuildingGhost, ConstructionSite, Info, Inventory, Job, MaterialOverrides, PlaceOfWork,
+    Transform, WorkplaceType,
+};
 
-use crate::{config::BUILDING_TRANSPARENCY, ClickState, Game};
+use crate::{
+    config::{BUILDING_TRANSPARENCY, CONSTRUCTION_TIME},
+    ClickState, Game,
+};
 
 pub fn construction_system(game: &mut Game) {
+    new_construction(game);
+
+    check_if_construction_finished(game);
+}
+
+fn check_if_construction_finished(game: &mut Game) {
     let world = &game.world;
     let mut command_buffer = game.command_buffer();
-    // Get the ghost entity, if it exists.
-    let Some((ghost_entity, _)) = world.query::<()>().with::<&BuildingGhost>().into_iter().next() else { return };
 
-    // If we tried to cancel construction, despawn ghost.
+    for (construction_site_entity, (construction_site, place_of_work, inventory)) in world
+        .query::<(&ConstructionSite, &mut PlaceOfWork, &mut Inventory)>()
+        .iter()
+    {
+        if construction_site.construction_progress < CONSTRUCTION_TIME {
+            continue;
+        }
+
+        // construction.. complete
+        log::info!("Construction complete!");
+        command_buffer.remove_one::<ConstructionSite>(construction_site_entity);
+        command_buffer.remove_one::<MaterialOverrides>(construction_site_entity);
+
+        for worker in place_of_work.workers.drain(..) {
+            command_buffer.remove_one::<Job>(worker);
+        }
+
+        *inventory = Default::default();
+
+        *place_of_work = match construction_site.workplace_type {
+            WorkplaceType::Forge => PlaceOfWork::forge(),
+            WorkplaceType::Factory => PlaceOfWork::factory(),
+            _ => unreachable!(),
+        };
+    }
+
+    game.run_command_buffer(command_buffer);
+}
+
+fn new_construction(game: &mut Game) {
+    let world = &game.world;
+    let mut command_buffer = game.command_buffer();
+    let Some((ghost_entity, _)) = world.query::<()>().with::<&BuildingGhost>().into_iter().next() else { return };
     if player_cancelled_construction(&game.input) {
         log::info!("Cancelling construction");
         command_buffer.despawn(ghost_entity);
         game.run_command_buffer(command_buffer);
         return;
     }
+    move_ghost(game, ghost_entity);
+    let is_colliding = update_collision_state(game, ghost_entity);
+    // Get the ghost entity, if it exists.
+
+    // If we tried to cancel construction, despawn ghost.
 
     // Move the ghost around
-    move_ghost(game, ghost_entity);
 
     // Check to see if there's any collisions
-    let is_colliding = update_collision_state(game, ghost_entity);
 
     // If we're not colliding, and the player left-clicked, then place a construction site
     if !is_colliding && game.input.mouse_state.left_click_state == ClickState::JustReleased {
@@ -38,7 +83,15 @@ fn place_construction_site(game: &mut Game, ghost_entity: hecs::Entity) {
         .workplace_type;
     world.remove_one::<BuildingGhost>(ghost_entity).unwrap();
     world
-        .insert(ghost_entity, (ConstructionSite::new(workplace_type),))
+        .insert(
+            ghost_entity,
+            (
+                ConstructionSite::new(workplace_type),
+                PlaceOfWork::construction_site(),
+                Info::new(format!("Construction Site - {workplace_type:?}")),
+                Inventory::default(),
+            ),
+        )
         .unwrap();
 
     let mut material_overrides = game

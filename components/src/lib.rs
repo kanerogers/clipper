@@ -76,7 +76,7 @@ impl Default for Dave {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Hash)]
 pub enum Resource {
     RawIron,
     Iron,
@@ -113,19 +113,29 @@ impl Info {
 #[derive(Debug, Clone, Default)]
 pub struct Selected;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Task {
     Gather,
     Smelt,
     MakePaperclips,
+    Construction,
 }
 
 impl Task {
-    pub const fn resource(&self) -> Resource {
+    pub const fn resource_produced(&self) -> Option<Resource> {
         match self {
-            Task::Gather => Resource::RawIron,
-            Task::Smelt => Resource::Iron,
-            Task::MakePaperclips => Resource::Paperclip,
+            Task::Gather => Some(Resource::RawIron),
+            Task::Smelt => Some(Resource::Iron),
+            Task::MakePaperclips => Some(Resource::Paperclip),
+            Task::Construction => None,
+        }
+    }
+
+    pub const fn resource_consumed(&self) -> Option<Resource> {
+        match self {
+            Task::Smelt => Some(Resource::RawIron),
+            Task::MakePaperclips => Some(Resource::Iron),
+            _ => None,
         }
     }
 
@@ -134,8 +144,17 @@ impl Task {
             Task::Gather => 8.,
             Task::Smelt => 4.,
             Task::MakePaperclips => 5.,
+            Task::Construction => 10.,
         }
     }
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Hash)]
+pub enum WorkplaceType {
+    Mine,
+    Forge,
+    Factory,
+    ConstructionSite,
 }
 
 #[derive(Debug, Clone)]
@@ -176,8 +195,8 @@ impl PlaceOfWork {
 
     pub fn construction_site() -> PlaceOfWork {
         PlaceOfWork {
-            place_type: WorkplaceType::Factory,
-            task: Task::MakePaperclips,
+            place_type: WorkplaceType::ConstructionSite,
+            task: Task::Construction,
             worker_capacity: 5,
             workers: Default::default(),
         }
@@ -198,20 +217,24 @@ impl BuildingGhost {
 #[derive(Debug, Clone)]
 pub struct ConstructionSite {
     pub workplace_type: WorkplaceType,
+    pub construction_progress: f32,
 }
 
 impl ConstructionSite {
     pub fn new(workplace_type: WorkplaceType) -> Self {
-        Self { workplace_type }
+        Self {
+            workplace_type,
+            construction_progress: 0.,
+        }
     }
-}
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Hash)]
-pub enum WorkplaceType {
-    Mine,
-    Forge,
-    Factory,
-    ConstructionSite,
+    pub fn resources_required(&self) -> (usize, Resource) {
+        match self.workplace_type {
+            WorkplaceType::Forge => (1, Resource::RawIron),
+            WorkplaceType::Factory => (1, Resource::Iron),
+            _ => unreachable!(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -229,7 +252,7 @@ impl Inventory {
         }
     }
 
-    pub fn take(&mut self, amount: usize, resource: &Resource) -> Option<usize> {
+    pub fn take(&mut self, amount: usize, resource: Resource) -> Option<usize> {
         println!("Attempting to take {amount} {resource:?} from {self:?}..");
         if let Some(remaining) = self.inner.get_mut(&resource) {
             if *remaining == 0 {
