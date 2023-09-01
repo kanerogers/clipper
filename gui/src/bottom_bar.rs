@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use common::{
     yakui::{
         colored_box, pad, widgets,
@@ -5,12 +7,14 @@ use common::{
         widgets::{List, Pad},
         Color, CrossAxisAlignment, MainAxisAlignment, MainAxisSize, Response,
     },
-    BarState, GUIState,
+    BarState, GUIState, BUILDING_TYPE_FACTORY, BUILDING_TYPE_FORGE, BUILDING_TYPE_MINE, GUICommand,
 };
 
 pub fn bottom_bar(gui_state: &mut GUIState) {
     let GUIState {
-        bars: bar_state, ..
+        command_queue,
+        bars: bar_state,
+        ..
     } = gui_state;
     let mut list = List::row();
     list.main_axis_alignment = MainAxisAlignment::Center;
@@ -27,7 +31,7 @@ pub fn bottom_bar(gui_state: &mut GUIState) {
                 column.item_spacing = 10.;
                 column.show(|| {
                     bars(bar_state);
-                    build_icons();
+                    build_icons(command_queue);
                 });
             });
         });
@@ -56,17 +60,29 @@ fn bar(label: &'static str, colour: Color, percentage: f32) {
     });
 }
 
-fn build_icons() {
+fn build_icons(commands: &mut VecDeque<GUICommand>) {
     let mut row = List::row();
     row.main_axis_size = MainAxisSize::Max;
     row.main_axis_alignment = MainAxisAlignment::Center;
     row.cross_axis_alignment = CrossAxisAlignment::Center;
     row.item_spacing = 10.;
+
+    let mut icon_clicked = None;
     row.show(|| {
-        icon_button(MINE);
-        icon_button(FORGE);
-        icon_button(FACTORY);
+        if icon_button(MINE).clicked {
+            icon_clicked = Some(BUILDING_TYPE_MINE);
+        }
+        if icon_button(FORGE).clicked {
+            icon_clicked = Some(BUILDING_TYPE_FORGE);
+        }
+        if icon_button(FACTORY).clicked {
+            icon_clicked = Some(BUILDING_TYPE_FACTORY);
+        }
     });
+
+    if let Some(building_type) = icon_clicked {
+        commands.push_back(GUICommand::ConstructBuilding(building_type));
+    }
 }
 
 fn icon_text(icon_codepoint: &'static str) -> Response<TextWidget> {

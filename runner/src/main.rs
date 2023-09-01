@@ -117,7 +117,6 @@ fn window_tick<R: Renderer>(
 
     if needs_restart {
         println!("Game needs restart!");
-        renderer.unload_assets();
         game.resized(renderer.window().inner_size());
     }
     renderer.update_assets(&mut game.world);

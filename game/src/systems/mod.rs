@@ -2,6 +2,7 @@ mod beacons;
 pub mod brainwash;
 mod click;
 pub mod combat;
+pub mod construction;
 pub mod dave_controller;
 pub mod find_brainwash_target;
 pub mod game_over;

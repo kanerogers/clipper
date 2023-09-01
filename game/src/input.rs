@@ -1,9 +1,12 @@
 use crate::ClickState;
 
 use super::{Game, Keys};
-use common::winit::{
-    self,
-    event::{ElementState, KeyboardInput, VirtualKeyCode, WindowEvent},
+use common::{
+    log,
+    winit::{
+        self,
+        event::{ElementState, KeyboardInput, VirtualKeyCode, WindowEvent},
+    },
 };
 
 pub fn handle_winit_event(game: &mut Game, event: winit::event::WindowEvent) {
@@ -103,6 +106,8 @@ fn handle_mouse_click(game: &mut Game, state: ElementState, button: winit::event
     let right = &mut mouse_input_state.right_click_state;
     let middle = &mut mouse_input_state.middle_click_state;
 
+    log::debug!("Mouse presssed: {button:?}");
+
     match (state, button) {
         (ElementState::Pressed, winit::event::MouseButton::Left) => {
             *left = ClickState::Down;
@@ -127,4 +132,6 @@ fn handle_mouse_click(game: &mut Game, state: ElementState, button: winit::event
         },
         _ => {}
     }
+
+    log::debug!("Mouse state: {:?}", game.input.mouse_state);
 }

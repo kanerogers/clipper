@@ -29,8 +29,6 @@ pub fn click_system(game: &mut Game) {
     if entity_was_selected || click_missed {
         update_selected_entity(&mut game.world, &mut command_buffer);
     }
-
-    reset_mouse_clicks(mouse_state);
 }
 
 fn update_selected_entity(world: &mut hecs::World, command_buffer: &mut hecs::CommandBuffer) {
@@ -43,19 +41,4 @@ fn update_selected_entity(world: &mut hecs::World, command_buffer: &mut hecs::Co
     // now update the world; this command buffer already has the command to insert
     // the `Selected` component, if one was selected
     command_buffer.run_on(world);
-}
-
-fn reset_mouse_clicks(mouse_state: &mut crate::MouseState) {
-    match mouse_state.left_click_state {
-        ClickState::JustReleased => mouse_state.left_click_state = ClickState::Released,
-        _ => {}
-    };
-    match mouse_state.right_click_state {
-        ClickState::JustReleased => mouse_state.right_click_state = ClickState::Released,
-        _ => {}
-    };
-    match mouse_state.middle_click_state {
-        ClickState::JustReleased => mouse_state.middle_click_state = ClickState::Released,
-        _ => {}
-    };
 }

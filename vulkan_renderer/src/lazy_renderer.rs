@@ -6,9 +6,9 @@ use crate::{
     LineVertex, NO_TEXTURE_ID,
 };
 use common::{glam, thunderdome, Camera, GeometryOffsets};
-use components::{GLTFModel, Material, MaterialOverrides, Transform, Vertex};
+use components::{GLTFAsset, GLTFModel, Material, MaterialOverrides, Transform, Vertex};
 
-use std::ffi::CStr;
+use std::{collections::HashMap, ffi::CStr};
 
 use ash::vk;
 use bytemuck::{Pod, Zeroable};
@@ -47,6 +47,7 @@ pub struct LazyRenderer {
     /// You know. A camera.
     pub camera: Camera,
     materials: thunderdome::Arena<GPUMaterial>,
+    asset_cache: HashMap<String, LoadedGLTFModel>,
 }
 
 #[derive(Clone)]
@@ -185,10 +186,12 @@ impl PushConstant {
     }
 }
 
+#[derive(Debug, Clone)]
 struct LoadedGLTFModel {
     primitives: Vec<GPUPrimitive>,
 }
 
+#[derive(Debug, Clone)]
 struct GPUPrimitive {
     pub geometry: thunderdome::Index,
     pub material: thunderdome::Index,
@@ -313,6 +316,7 @@ impl LazyRenderer {
             user_textures: Default::default(),
             camera: Default::default(),
             materials: Default::default(),
+            asset_cache: Default::default(),
         }
     }
 
@@ -528,20 +532,32 @@ impl LazyRenderer {
         world: &mut common::hecs::World,
     ) {
         let mut command_buffer = common::hecs::CommandBuffer::new();
-        for (entity, asset) in world
-            .query::<&GLTFModel>()
+        for (entity, (model, asset)) in world
+            .query::<(&GLTFModel, &GLTFAsset)>()
             .without::<&LoadedGLTFModel>()
             .iter()
         {
+            let asset_name = asset.name.clone();
+
+            // check our asset cache *first*
+            if let Some(cached_asset) = self.asset_cache.get(&asset_name) {
+                command_buffer.insert_one(entity, cached_asset.clone());
+                continue;
+            }
+
+            // not cached, import it
             let mut primitives = Vec::new();
-            for primitive in asset.primitives.iter() {
+            for primitive in model.primitives.iter() {
                 let geometry = self
                     .geometry_buffers
                     .insert(&primitive.indices, &primitive.vertices);
                 let material = self.import_material(&primitive.material, vulkan_context);
                 primitives.push(GPUPrimitive { geometry, material });
             }
-            command_buffer.insert_one(entity, LoadedGLTFModel { primitives });
+            let loaded_model = LoadedGLTFModel { primitives };
+
+            self.asset_cache.insert(asset_name, loaded_model.clone());
+            command_buffer.insert_one(entity, loaded_model);
         }
 
         command_buffer.run_on(world);
@@ -622,6 +638,7 @@ impl LazyRenderer {
         // empty the descriptors
         self.descriptors.cleanup(device);
         self.descriptors = Descriptors::new(vulkan_context);
+        self.asset_cache = Default::default();
     }
 }
 
@@ -745,11 +762,11 @@ fn create_line_pipeline(
         ..Default::default()
     };
     let color_blend_attachment_states = [vk::PipelineColorBlendAttachmentState {
-        blend_enable: 0,
-        src_color_blend_factor: vk::BlendFactor::SRC_COLOR,
-        dst_color_blend_factor: vk::BlendFactor::ONE_MINUS_DST_COLOR,
+        blend_enable: vk::TRUE,
+        src_color_blend_factor: vk::BlendFactor::SRC_ALPHA,
+        dst_color_blend_factor: vk::BlendFactor::ONE_MINUS_DST_ALPHA,
         color_blend_op: vk::BlendOp::ADD,
-        src_alpha_blend_factor: vk::BlendFactor::ZERO,
+        src_alpha_blend_factor: vk::BlendFactor::ONE,
         dst_alpha_blend_factor: vk::BlendFactor::ZERO,
         alpha_blend_op: vk::BlendOp::ADD,
         color_write_mask: vk::ColorComponentFlags::RGBA,
@@ -916,11 +933,11 @@ fn create_mesh_pipeline(
         ..Default::default()
     };
     let color_blend_attachment_states = [vk::PipelineColorBlendAttachmentState {
-        blend_enable: 0,
-        src_color_blend_factor: vk::BlendFactor::SRC_COLOR,
-        dst_color_blend_factor: vk::BlendFactor::ONE_MINUS_DST_COLOR,
+        blend_enable: vk::TRUE,
+        src_color_blend_factor: vk::BlendFactor::SRC_ALPHA,
+        dst_color_blend_factor: vk::BlendFactor::ONE_MINUS_SRC_ALPHA,
         color_blend_op: vk::BlendOp::ADD,
-        src_alpha_blend_factor: vk::BlendFactor::ZERO,
+        src_alpha_blend_factor: vk::BlendFactor::ONE,
         dst_alpha_blend_factor: vk::BlendFactor::ZERO,
         alpha_blend_op: vk::BlendOp::ADD,
         color_write_mask: vk::ColorComponentFlags::RGBA,
