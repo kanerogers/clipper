@@ -173,6 +173,15 @@ impl PlaceOfWork {
             workers: Default::default(),
         }
     }
+
+    pub fn construction_site() -> PlaceOfWork {
+        PlaceOfWork {
+            place_type: WorkplaceType::Factory,
+            task: Task::MakePaperclips,
+            worker_capacity: 5,
+            workers: Default::default(),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -186,11 +195,23 @@ impl BuildingGhost {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct ConstructionSite {
+    pub workplace_type: WorkplaceType,
+}
+
+impl ConstructionSite {
+    pub fn new(workplace_type: WorkplaceType) -> Self {
+        Self { workplace_type }
+    }
+}
+
 #[derive(Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Hash)]
 pub enum WorkplaceType {
     Mine,
     Forge,
     Factory,
+    ConstructionSite,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]

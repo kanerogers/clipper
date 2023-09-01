@@ -16,10 +16,11 @@ pub fn click_system(game: &mut Game) {
             game.last_ray = Some(ray);
 
             if let Some(entity) = game.physics_context.cast_ray(&ray) {
-                let info = game.world.get::<&Info>(entity).unwrap();
-                command_buffer.insert_one(entity, Selected);
-                entity_was_selected = true;
-                println!("You clicked on {info:?}");
+                if let Ok(info) = game.world.get::<&Info>(entity) {
+                    command_buffer.insert_one(entity, Selected);
+                    entity_was_selected = true;
+                    println!("You clicked on {info:?}");
+                }
             } else {
                 click_missed = true;
             }
