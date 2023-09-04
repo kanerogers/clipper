@@ -10,7 +10,8 @@ use common::{
         self, button, colored_box_container, column, expanded,
         font::{Font, FontSettings, Fonts},
         geometry::Rect,
-        pad, row, text, widgets,
+        pad, row, text,
+        widgets::{self, ColoredBox},
         widgets::{List, Pad},
         Color, CrossAxisAlignment, MainAxisAlignment, MainAxisSize,
     },
@@ -70,7 +71,28 @@ pub fn draw_gui(gui: &mut GUI) {
 
     inspectors(gui_state);
     bottom_bar(gui_state);
+    clock(gui_state);
     gui.yak.finish();
+}
+
+fn clock(gui_state: &mut GUIState) {
+    let mut row = List::row();
+    row.main_axis_size = MainAxisSize::Max;
+    row.main_axis_alignment = MainAxisAlignment::End;
+    row.cross_axis_alignment = CrossAxisAlignment::End;
+
+    row.show(|| {
+        let container = ColoredBox::container(Color::RED);
+        container.show_children(|| {
+            pad(Pad::all(10.), || {
+                let mut col = widgets::List::column();
+                col.main_axis_size = MainAxisSize::Min;
+                col.show(|| {
+                    text(20., gui_state.clock.clone());
+                });
+            });
+        });
+    });
 }
 
 fn inspectors(gui_state: &mut GUIState) {

@@ -1,8 +1,10 @@
+pub mod clock;
 mod config;
 mod init;
 mod input;
 mod systems;
 pub mod time;
+use clock::Clock;
 use common::{
     bitflags::bitflags,
     glam::{Quat, Vec2, Vec3},
@@ -14,9 +16,9 @@ use common::{
     BUILDING_TYPE_FACTORY, BUILDING_TYPE_FORGE,
 };
 use components::{
-    BrainwashState, BuildingGhost, Collider, Dave, GLTFAsset, Health, Inventory, Job, JobState,
-    MaterialOverrides, PlaceOfWork, Resource, Selected, Storage, Task, Transform, Viking,
-    WorkplaceType, ConstructionSite,
+    BrainwashState, BuildingGhost, Collider, ConstructionSite, Dave, GLTFAsset, Health, Inventory,
+    Job, JobState, MaterialOverrides, PlaceOfWork, Resource, Selected, Storage, Task, Transform,
+    Viking, WorkplaceType,
 };
 use config::{BUILDING_TRANSPARENCY, MAX_ENERGY, MAX_HEALTH};
 use init::init_game;
@@ -46,6 +48,7 @@ pub fn init() -> Game {
 pub fn tick(game: &mut Game, gui_state: &mut GUIState) -> bool {
     let mut need_restart = false;
     while game.time.start_update() {
+        game.clock.advance(game.time.delta());
         game.debug_lines.clear();
         need_restart = process_gui_command_queue(game, &mut gui_state.command_queue);
         update_camera(game);
@@ -142,8 +145,11 @@ fn set_worker_count(
             // TODO: this is inelegant
             if place_of_work.task == Task::Construction {
                 let storage = world.query::<&Storage>().iter().next().unwrap().0;
-                let construction_site = world.get::<&ConstructionSite>(place_of_work_entity).unwrap();
-                job.state = JobState::FetchingResource(construction_site.resources_required().1, storage);
+                let construction_site = world
+                    .get::<&ConstructionSite>(place_of_work_entity)
+                    .unwrap();
+                job.state =
+                    JobState::FetchingResource(construction_site.resources_required().1, storage);
             }
             command_buffer.insert_one(worker_entity, job);
         }
@@ -211,6 +217,7 @@ pub struct Game {
     pub debug_lines: Vec<Line>,
     pub last_ray: Option<Ray>,
     pub game_over: bool,
+    pub clock: Clock,
 }
 
 impl Default for Game {
@@ -226,6 +233,7 @@ impl Default for Game {
             debug_lines: Default::default(),
             last_ray: None,
             game_over: false,
+            clock: Default::default(),
         }
     }
 }
@@ -424,6 +432,13 @@ fn update_gui_state(game: &mut Game, gui_state: &mut GUIState) {
         gui_state.bars.health_percentage = health.value as f32 / MAX_HEALTH as f32;
         gui_state.bars.energy_percentage = dave.energy as f32 / MAX_ENERGY as f32;
     }
+
+    gui_state.clock = format!("{}", game.clock);
+    gui_state.clock_description = if game.clock.is_work_time() {
+        "Work Time".to_string()
+    } else {
+        "Rest Time".to_string()
+    };
 
     if let Some((entity, (viking, job))) = game
         .world

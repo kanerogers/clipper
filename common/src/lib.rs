@@ -107,6 +107,8 @@ pub struct GUIState {
     pub selected_item: Option<(Entity, SelectedItemInfo)>,
     pub command_queue: VecDeque<GUICommand>,
     pub bars: BarState,
+    pub clock: String,
+    pub clock_description: String,
 }
 
 #[derive(Debug, Clone, Default)]
