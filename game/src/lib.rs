@@ -13,23 +13,24 @@ use common::{
     rapier3d::prelude::Ray,
     winit::{self},
     Camera, GUICommand, GUIState, Line, PlaceOfWorkInfo, SelectedItemInfo, VikingInfo,
-    BUILDING_TYPE_FACTORY, BUILDING_TYPE_FORGE,
+    BUILDING_TYPE_FACTORY, BUILDING_TYPE_FORGE, BUILDING_TYPE_HOUSE,
 };
 use components::{
-    BrainwashState, BuildingGhost, Collider, ConstructionSite, Dave, GLTFAsset, Health, Inventory,
-    Job, JobState, MaterialOverrides, PlaceOfWork, Resource, Selected, Storage, Task, Transform,
-    Viking, WorkplaceType,
+    BrainwashState, Building, BuildingGhost, Collider, ConstructionSite, Dave, GLTFAsset, Health,
+    HumanNeeds, Inventory, Job, JobState, MaterialOverrides, PlaceOfWork, Resource, RestState,
+    Selected, Storage, Task, Transform, Viking, WorkplaceType,
 };
 use config::{BUILDING_TRANSPARENCY, MAX_ENERGY, MAX_HEALTH};
 use init::init_game;
-use std::collections::VecDeque;
+use std::{collections::VecDeque, time::Instant};
 use systems::{
     beacons, brainwash::brainwash_system, click_system, combat::combat_system,
     construction::construction_system, dave_controller,
-    find_brainwash_target::update_brainwash_target, from_na, game_over::game_over_system, physics,
-    regen::regen_system, target_indicator::target_indicator_system,
-    transform_hierarchy::transform_hierarchy_system, update_position::update_position_system,
-    viking_velocity::update_viking_velocity, viking_work::viking_work_system, PhysicsContext,
+    find_brainwash_target::update_brainwash_target, from_na, game_over::game_over_system,
+    human_needs::human_needs_system, physics, regen::regen_system,
+    target_indicator::target_indicator_system, transform_hierarchy::transform_hierarchy_system,
+    update_position::update_position_system, viking_behaviour::viking_behaviour_system,
+    viking_velocity::update_viking_velocity, PhysicsContext,
 };
 use time::Time;
 
@@ -62,10 +63,11 @@ pub fn tick(game: &mut Game, gui_state: &mut GUIState) -> bool {
             combat_system(game);
             regen_system(game);
             construction_system(game);
+            target_indicator_system(game);
+            viking_behaviour_system(game);
+            human_needs_system(game);
         }
 
-        target_indicator_system(game);
-        viking_work_system(game);
         update_viking_velocity(game);
         physics(game);
         beacons(game);
@@ -166,8 +168,9 @@ fn show_ghost_building(
     command_buffer: &mut hecs::CommandBuffer,
 ) {
     let (building_type, asset_name) = match building_name {
-        BUILDING_TYPE_FACTORY => (WorkplaceType::Factory, "factory.glb"),
-        BUILDING_TYPE_FORGE => (WorkplaceType::Forge, "forge.glb"),
+        BUILDING_TYPE_FACTORY => (Building::PlaceOfWork(WorkplaceType::Factory), "factory.glb"),
+        BUILDING_TYPE_FORGE => (Building::PlaceOfWork(WorkplaceType::Forge), "forge.glb"),
+        BUILDING_TYPE_HOUSE => (Building::House, "house.glb"),
         _ => {
             log::error!("Attempted to build unknown building type {building_name}");
             return;
@@ -218,6 +221,8 @@ pub struct Game {
     pub last_ray: Option<Ray>,
     pub game_over: bool,
     pub clock: Clock,
+    pub human_needs_state: HumanNeedsState,
+    pub total_deaths: usize,
 }
 
 impl Default for Game {
@@ -234,6 +239,8 @@ impl Default for Game {
             last_ray: None,
             game_over: false,
             clock: Default::default(),
+            human_needs_state: HumanNeedsState::default(),
+            total_deaths: 0,
         }
     }
 }
@@ -433,16 +440,17 @@ fn update_gui_state(game: &mut Game, gui_state: &mut GUIState) {
         gui_state.bars.energy_percentage = dave.energy as f32 / MAX_ENERGY as f32;
     }
 
-    gui_state.clock = format!("{}", game.clock);
+    gui_state.clock = format!("{} - {:.2}", game.clock, game.clock.time_of_day());
     gui_state.clock_description = if game.clock.is_work_time() {
         "Work Time".to_string()
     } else {
         "Rest Time".to_string()
     };
+    gui_state.total_deaths = game.total_deaths;
 
-    if let Some((entity, (viking, job))) = game
+    if let Some((entity, (viking, inventory, job, needs, rest_state))) = game
         .world
-        .query::<(&Viking, Option<&Job>)>()
+        .query::<(&Viking, &Inventory, Option<&Job>, &HumanNeeds, &RestState)>()
         .with::<&Selected>()
         .iter()
         .next()
@@ -456,13 +464,15 @@ fn update_gui_state(game: &mut Game, gui_state: &mut GUIState) {
         gui_state.selected_item = Some((
             entity,
             SelectedItemInfo::Viking(VikingInfo {
-                inventory: format!("{:?}", viking.inventory),
+                inventory: format!("{:?}", inventory),
                 name: "Boris".into(),
                 state: format!("{}", viking.brainwash_state),
                 place_of_work: format!("{place_of_work:?}"),
                 intelligence: viking.intelligence,
                 strength: viking.strength,
                 stamina: viking.stamina,
+                needs: format!("{needs:?}"),
+                rest_state: format!("{rest_state:?}"),
             }),
         ));
         return;
@@ -525,4 +535,17 @@ fn reset_mouse_clicks(mouse_state: &mut crate::MouseState) {
         ClickState::JustReleased => mouse_state.middle_click_state = ClickState::Released,
         _ => {}
     };
+}
+
+#[derive(Debug, Clone)]
+pub struct HumanNeedsState {
+    pub last_updated_at: Instant,
+}
+
+impl Default for HumanNeedsState {
+    fn default() -> Self {
+        Self {
+            last_updated_at: Instant::now(),
+        }
+    }
 }

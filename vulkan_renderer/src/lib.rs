@@ -78,6 +78,7 @@ impl Renderer for LazyVulkan {
         lines: &[common::Line],
         camera: Camera,
         yak: &mut yakui::Yakui,
+        time_of_day: f32,
     ) {
         let swapchain_index = self.render_begin();
         self.renderer.camera = camera;
@@ -101,8 +102,13 @@ impl Renderer for LazyVulkan {
 
         let draw_calls = self.renderer.build_draw_calls(world);
 
-        self.renderer
-            ._render(context, swapchain_index, &draw_calls, &line_vertices);
+        self.renderer._render(
+            context,
+            swapchain_index,
+            &draw_calls,
+            &line_vertices,
+            time_of_day,
+        );
 
         self.yakui_vulkan
             .paint(yak, &context.into(), swapchain_index);

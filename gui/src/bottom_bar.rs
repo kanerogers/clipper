@@ -8,7 +8,10 @@ use common::{
         Color, CrossAxisAlignment, MainAxisAlignment, MainAxisSize, Response,
     },
     BarState, GUICommand, GUIState, BUILDING_TYPE_FACTORY, BUILDING_TYPE_FORGE,
+    BUILDING_TYPE_HOUSE,
 };
+
+use crate::CONTAINER_BACKGROUND;
 
 pub fn bottom_bar(gui_state: &mut GUIState) {
     let GUIState {
@@ -21,7 +24,7 @@ pub fn bottom_bar(gui_state: &mut GUIState) {
     list.cross_axis_alignment = CrossAxisAlignment::End;
 
     list.show(|| {
-        let container = widgets::ColoredBox::container(Color::rgba(0, 0, 0, 200));
+        let container = widgets::ColoredBox::container(CONTAINER_BACKGROUND);
         container.show_children(|| {
             pad(Pad::balanced(20., 10.), || {
                 let mut column = List::column();
@@ -75,6 +78,9 @@ fn build_icons(commands: &mut VecDeque<GUICommand>) {
         if icon_button(FACTORY).clicked {
             icon_clicked = Some(BUILDING_TYPE_FACTORY);
         }
+        if icon_button(HOUSE).clicked {
+            icon_clicked = Some(BUILDING_TYPE_HOUSE);
+        }
     });
 
     if let Some(building_type) = icon_clicked {
@@ -105,3 +111,6 @@ pub const HEART: &str = "\u{f004}";
 pub const BOLT: &str = "\u{f0e7}";
 pub const FORGE: &str = "\u{f06d}";
 pub const FACTORY: &str = "\u{f275}";
+pub const HOUSE: &str = "\u{f015}";
+pub const HAMMER: &str = "\u{f6e3}";
+pub const MOON: &str = "\u{f186}";

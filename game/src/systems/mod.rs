@@ -6,13 +6,14 @@ pub mod construction;
 pub mod dave_controller;
 pub mod find_brainwash_target;
 pub mod game_over;
+pub mod human_needs;
 mod physics;
 pub mod regen;
 pub mod target_indicator;
 pub mod transform_hierarchy;
 pub mod update_position;
+pub mod viking_behaviour;
 pub mod viking_velocity;
-pub mod viking_work;
 
 pub use beacons::beacons;
 pub use click::click_system;

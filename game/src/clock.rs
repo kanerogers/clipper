@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use common::log;
 
-pub const WALL_TO_GAME: f32 = 60.0;
+pub const WALL_TO_GAME: f32 = 120.0;
 
 /// The in-game clock
 #[derive(Debug, Clone, Default)]
@@ -21,6 +21,13 @@ impl Display for Clock {
 }
 
 impl Clock {
+    /// Create a new clock beginning at [`hour`]
+    pub fn new(hour: usize) -> Clock {
+        Clock {
+            day: 0,
+            game_seconds: (hour * 60 * 60) as f32,
+        }
+    }
     pub fn advance(&mut self, dt: f32) {
         self.game_seconds += dt * WALL_TO_GAME;
 
@@ -53,6 +60,20 @@ impl Clock {
     pub fn day(&self) -> usize {
         self.day
     }
+
+    pub fn time_of_day(&self) -> f32 {
+        // Normalize game_seconds to a value between 0 and 2*PI
+        let normalized_time = (self.game_seconds / 86400.0) * 2.0 * std::f32::consts::PI;
+
+        // Shift the phase by PI/2 to align with midday and midnight
+        let shifted_time = normalized_time - std::f32::consts::PI / 2.0;
+
+        // Use sine function to map time to a value between -1 and 1
+        let sine_value = f32::sin(shifted_time);
+
+        // Shift and scale sine_value to be between 0 and 1
+        (sine_value + 1.0) / 2.0
+    }
 }
 
 #[cfg(test)]
@@ -68,7 +89,7 @@ mod tests {
         assert!(!clock.is_work_time());
 
         // Advance the clock to 8000
-        for _ in 0..(8 * 60 * 60) {
+        for _ in 0..(4 * 60 * 60) {
             clock.advance(dt);
         }
 
@@ -77,7 +98,7 @@ mod tests {
         assert!(clock.is_work_time());
 
         // Advance the clock to 2000
-        for _ in 0..(12 * 60 * 60) {
+        for _ in 0..(6 * 60 * 60) {
             clock.advance(dt);
         }
 
@@ -86,7 +107,7 @@ mod tests {
         assert!(!clock.is_work_time());
 
         // Advance the clock to 2359
-        for _ in 0..(4 * 60 * 60) - 1 {
+        for _ in 0..(2 * 60 * 60) - 1 {
             clock.advance(dt);
         }
 

@@ -1,11 +1,9 @@
-use super::Inventory;
 use std::{fmt::Display, time::Instant};
 
 #[derive(Clone, Debug)]
 pub struct Viking {
     pub brainwash_state: BrainwashState,
     pub last_update: Instant,
-    pub inventory: Inventory,
     pub intelligence: usize,
     pub strength: usize,
     pub stamina: usize,
@@ -16,7 +14,6 @@ impl Default for Viking {
         Self {
             last_update: Instant::now(),
             brainwash_state: BrainwashState::Free,
-            inventory: Default::default(),
             intelligence: 0,
             strength: 0,
             stamina: 0,

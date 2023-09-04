@@ -1,7 +1,7 @@
 use super::from_na;
 use common::{hecs, log};
 use components::{
-    BuildingGhost, ConstructionSite, Info, Inventory, Job, MaterialOverrides, PlaceOfWork,
+    BuildingGhost, ConstructionSite, House, Info, Inventory, Job, MaterialOverrides, PlaceOfWork,
     Transform, WorkplaceType,
 };
 
@@ -39,11 +39,19 @@ fn check_if_construction_finished(game: &mut Game) {
 
         *inventory = Default::default();
 
-        *place_of_work = match construction_site.workplace_type {
-            WorkplaceType::Forge => PlaceOfWork::forge(),
-            WorkplaceType::Factory => PlaceOfWork::factory(),
-            _ => unreachable!(),
-        };
+        match construction_site.target_building {
+            components::Building::House => {
+                command_buffer.remove_one::<PlaceOfWork>(construction_site_entity);
+                command_buffer.insert_one(construction_site_entity, House::new(4));
+            }
+            components::Building::PlaceOfWork(new_place_of_work) => {
+                *place_of_work = match new_place_of_work {
+                    WorkplaceType::Forge => PlaceOfWork::forge(),
+                    WorkplaceType::Factory => PlaceOfWork::factory(),
+                    _ => unreachable!(),
+                }
+            }
+        }
     }
 
     game.run_command_buffer(command_buffer);
@@ -80,7 +88,7 @@ fn place_construction_site(game: &mut Game, ghost_entity: hecs::Entity) {
     let workplace_type = world
         .get::<&BuildingGhost>(ghost_entity)
         .unwrap()
-        .workplace_type;
+        .target_building;
     world.remove_one::<BuildingGhost>(ghost_entity).unwrap();
     world
         .insert(

@@ -109,6 +109,7 @@ pub struct GUIState {
     pub bars: BarState,
     pub clock: String,
     pub clock_description: String,
+    pub total_deaths: usize,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -133,6 +134,8 @@ pub struct VikingInfo {
     pub intelligence: usize,
     pub strength: usize,
     pub stamina: usize,
+    pub needs: String,
+    pub rest_state: String,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -159,6 +162,7 @@ pub trait Renderer {
         lines: &[Line],
         camera: Camera,
         yak: &mut yakui::Yakui,
+        time_of_day: f32,
     );
     fn resized(&mut self, size: winit::dpi::PhysicalSize<u32>);
     fn cleanup(&mut self);
@@ -188,3 +192,4 @@ pub enum GUICommand {
 pub const BUILDING_TYPE_MINE: &str = "mine";
 pub const BUILDING_TYPE_FORGE: &str = "forge";
 pub const BUILDING_TYPE_FACTORY: &str = "factory";
+pub const BUILDING_TYPE_HOUSE: &str = "house";

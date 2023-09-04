@@ -171,17 +171,24 @@ struct PushConstant {
     material: GPUMaterial,
     view_pos: glam::Vec4,
     mvp: glam::Mat4,
+    time_of_day: f32,
 }
 
 unsafe impl Zeroable for PushConstant {}
 unsafe impl Pod for PushConstant {}
 
 impl PushConstant {
-    pub fn new(material: GPUMaterial, view_pos: glam::Vec4, mvp: glam::Mat4) -> Self {
+    pub fn new(
+        material: GPUMaterial,
+        time_of_day: f32,
+        view_pos: glam::Vec4,
+        mvp: glam::Mat4,
+    ) -> Self {
         Self {
             material,
             view_pos,
             mvp,
+            time_of_day,
         }
     }
 }
@@ -327,6 +334,7 @@ impl LazyRenderer {
         framebuffer_index: u32,
         draw_calls: &[DrawCall],
         line_vertices: &[LineVertex],
+        time_of_day: f32,
     ) {
         let device = &vulkan_context.device;
         let command_buffer = vulkan_context.draw_command_buffer;
@@ -415,6 +423,7 @@ impl LazyRenderer {
                     0,
                     bytemuck::bytes_of(&PushConstant::new(
                         material,
+                        time_of_day,
                         self.camera.position.extend(1.),
                         mvp,
                     )),

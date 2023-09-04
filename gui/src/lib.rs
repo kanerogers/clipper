@@ -18,6 +18,8 @@ use common::{
     GUICommand, PlaceOfWorkInfo, VikingInfo,
 };
 
+pub const CONTAINER_BACKGROUND: Color = Color::rgba(0, 0, 0, 150);
+
 pub struct GUI {
     pub yak: yakui::Yakui,
     pub state: GUIState,
@@ -64,7 +66,7 @@ pub fn draw_gui(gui: &mut GUI) {
     let commands = &mut gui_state.command_queue;
 
     if gui_state.game_over {
-        game_over(gui_state.paperclips, commands);
+        game_over(gui_state.paperclips, gui_state.total_deaths, commands);
         gui.yak.finish();
         return;
     }
@@ -82,13 +84,16 @@ fn clock(gui_state: &mut GUIState) {
     row.cross_axis_alignment = CrossAxisAlignment::End;
 
     row.show(|| {
-        let container = ColoredBox::container(Color::RED);
+        let container = ColoredBox::container(CONTAINER_BACKGROUND);
         container.show_children(|| {
             pad(Pad::all(10.), || {
                 let mut col = widgets::List::column();
                 col.main_axis_size = MainAxisSize::Min;
+                col.cross_axis_alignment = CrossAxisAlignment::End;
+                col.item_spacing = 10.;
                 col.show(|| {
                     text(20., gui_state.clock.clone());
+                    text(16., gui_state.clock_description.clone());
                 });
             });
         });
@@ -100,40 +105,46 @@ fn inspectors(gui_state: &mut GUIState) {
         paperclips,
         idle_workers,
         command_queue,
+        total_deaths,
         ..
     } = gui_state;
     row(|| {
-        colored_box_container(Color::rgba(0, 0, 0, 200), || {
-            let mut col = widgets::List::column();
-            col.main_axis_size = MainAxisSize::Min;
-            col.show(|| {
-                text(30., format!("Idle Workers: {idle_workers}"));
-                text(30., format!("Paperclips: {paperclips}"));
+        colored_box_container(CONTAINER_BACKGROUND, || {
+            pad(Pad::all(10.), || {
+                let mut col = widgets::List::column();
+                col.main_axis_size = MainAxisSize::Min;
+                col.show(|| {
+                    text(30., format!("Idle Workers: {idle_workers}"));
+                    text(30., format!("Paperclips: {paperclips}"));
+                    text(30., format!("Deaths: {total_deaths}"));
+                });
             });
         });
         expanded(|| {});
 
         if let Some((entity, selected_item)) = &gui_state.selected_item {
-            let mut container = widgets::ColoredBox::container(Color::rgba(0, 0, 0, 200));
+            let mut container = widgets::ColoredBox::container(CONTAINER_BACKGROUND);
             container.min_size.x = 200.;
-            container.show_children(|| match selected_item {
-                common::SelectedItemInfo::Viking(h) => viking(*entity, h, command_queue),
-                common::SelectedItemInfo::PlaceOfWork(p) => {
-                    place_of_work(*entity, p, command_queue)
-                }
-                common::SelectedItemInfo::Storage(s) => storage(s),
+            container.show_children(|| {
+                pad(Pad::all(10.), || match selected_item {
+                    common::SelectedItemInfo::Viking(h) => viking(*entity, h, command_queue),
+                    common::SelectedItemInfo::PlaceOfWork(p) => {
+                        place_of_work(*entity, p, *idle_workers, command_queue)
+                    }
+                    common::SelectedItemInfo::Storage(s) => storage(s),
+                });
             });
         }
     });
 }
 
-fn game_over(paperclip_count: usize, commands: &mut VecDeque<GUICommand>) {
+fn game_over(paperclip_count: usize, deaths: usize, commands: &mut VecDeque<GUICommand>) {
     let mut the_box = List::column();
     the_box.main_axis_alignment = MainAxisAlignment::Center;
     the_box.cross_axis_alignment = CrossAxisAlignment::Center;
 
     the_box.show(|| {
-        let container = widgets::ColoredBox::container(Color::rgba(0, 0, 0, 200));
+        let container = widgets::ColoredBox::container(CONTAINER_BACKGROUND);
         container.show_children(|| {
             pad(Pad::balanced(20., 10.), || {
                 let mut column = List::column();
@@ -143,6 +154,7 @@ fn game_over(paperclip_count: usize, commands: &mut VecDeque<GUICommand>) {
                 column.show(|| {
                     text(100., "GAME OVER");
                     text(50., format!("You made {paperclip_count} paperclips."));
+                    text(50., format!("You were responsible for {deaths} deaths."));
                     text(50., format!("You maintained AI safety."));
                     let res = button("Try again");
                     if res.clicked {
@@ -171,6 +183,8 @@ fn viking(entity: hecs::Entity, h: &VikingInfo, commands: &mut VecDeque<GUIComma
         stamina,
         strength,
         intelligence,
+        needs,
+        rest_state,
     } = &h;
     column(|| {
         text(30., "Worker");
@@ -178,6 +192,8 @@ fn viking(entity: hecs::Entity, h: &VikingInfo, commands: &mut VecDeque<GUIComma
         text(20., format!("State: {state}"));
         text(20., format!("Place of work: {place_of_work}"));
         text(20., format!("Inventory: {inventory}"));
+        text(20., format!("Needs: {needs}"));
+        text(20., format!("Rest state: {rest_state}"));
         text(20., format!("Strength: {strength}"));
         text(20., format!("Stamina: {stamina}"));
         text(20., format!("Intelligence: {intelligence}"));
@@ -188,7 +204,12 @@ fn viking(entity: hecs::Entity, h: &VikingInfo, commands: &mut VecDeque<GUIComma
     });
 }
 
-fn place_of_work(entity: hecs::Entity, p: &PlaceOfWorkInfo, commands: &mut VecDeque<GUICommand>) {
+fn place_of_work(
+    entity: hecs::Entity,
+    p: &PlaceOfWorkInfo,
+    idle_workers: usize,
+    commands: &mut VecDeque<GUICommand>,
+) {
     let PlaceOfWorkInfo {
         name,
         task,
@@ -202,7 +223,7 @@ fn place_of_work(entity: hecs::Entity, p: &PlaceOfWorkInfo, commands: &mut VecDe
         text(20., format!("Task: {task}"));
         text(20., format!("Workers: {workers}/{max_workers}"));
         text(20., format!("Stock: {stock}"));
-        if workers < max_workers {
+        if workers < max_workers && idle_workers > 0 {
             let add_workers = button("Add workers");
             if add_workers.clicked {
                 commands.push_back(GUICommand::SetWorkerCount(entity, workers + 1))
