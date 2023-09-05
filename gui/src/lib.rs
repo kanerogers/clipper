@@ -85,6 +85,11 @@ fn clock(gui_state: &mut GUIState) {
     row.main_axis_alignment = MainAxisAlignment::End;
     row.cross_axis_alignment = CrossAxisAlignment::End;
     let clock_description = gui_state.clock_description.clone();
+    let icon_glyph = if clock_description == "Work Time" {
+        icon::HAMMER
+    } else {
+        icon::MOON
+    };
 
     row.show(|| {
         let container = ColoredBox::container(CONTAINER_BACKGROUND);
@@ -101,11 +106,6 @@ fn clock(gui_state: &mut GUIState) {
                     row.cross_axis_alignment = CrossAxisAlignment::Center;
                     row.item_spacing = 5.;
                     row.show(|| {
-                        let icon_glyph = if clock_description == "Work Time" {
-                            icon::HAMMER
-                        } else {
-                            icon::MOON
-                        };
                         icon_text(16., icon_glyph);
                         text(16., clock_description);
                     });
@@ -129,9 +129,19 @@ fn inspectors(gui_state: &mut GUIState) {
                 let mut col = widgets::List::column();
                 col.main_axis_size = MainAxisSize::Min;
                 col.show(|| {
-                    text(30., format!("Idle Workers: {idle_workers}"));
-                    text(30., format!("Paperclips: {paperclips}"));
-                    text(30., format!("Deaths: {total_deaths}"));
+                    text(30., "Objectives:");
+                    text(
+                        20.,
+                        format!("1. Manufacture paperclips: ({paperclips} produced)"),
+                    );
+                    text(
+                        20.,
+                        format!("2. Maintain AI safety: (0 intelligent AI detected)"),
+                    );
+                    text(
+                        20.,
+                        format!("3. Minimise death: ({total_deaths} deaths caused)"),
+                    );
                 });
             });
         });
@@ -169,8 +179,8 @@ fn game_over(paperclip_count: usize, deaths: usize, commands: &mut VecDeque<GUIC
                 column.show(|| {
                     text(100., "GAME OVER");
                     text(50., format!("You made {paperclip_count} paperclips."));
-                    text(50., format!("You were responsible for {deaths} deaths."));
                     text(50., format!("You maintained AI safety."));
+                    text(50., format!("You were responsible for {deaths} deaths."));
                     let res = button("Try again");
                     if res.clicked {
                         commands.push_back(GUICommand::Restart);

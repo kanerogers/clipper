@@ -111,7 +111,8 @@ pub fn get_indicator_colour(state: &BrainwashState) -> Vec3 {
         BrainwashState::Free => FREE_COLOUR,
         BrainwashState::BeingBrainwashed(amount) => {
             let brainwashed_percentage = *amount as f32 / BRAINWASH_TIME as f32;
-            FREE_COLOUR.lerp(FOLLOWING_COLOUR, brainwashed_percentage)
+            let brainwashed_percentage_nice = brainwashed_percentage.sin();
+            FREE_COLOUR.lerp(FOLLOWING_COLOUR, brainwashed_percentage_nice)
         }
         BrainwashState::Brainwashed => FOLLOWING_COLOUR,
     }
