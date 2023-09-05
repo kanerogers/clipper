@@ -96,7 +96,7 @@ pub fn init_game() -> Game {
         camera,
         dave,
         world,
-        clock: Clock::new(18),
+        clock: Clock::new(16),
         ..Default::default()
     }
 }

@@ -2,6 +2,8 @@ use std::fmt::Display;
 
 use common::log;
 
+use crate::config::{WORK_TIME_BEGIN, WORK_TIME_END};
+
 pub const WALL_TO_GAME: f32 = 120.0;
 
 /// The in-game clock
@@ -44,7 +46,7 @@ impl Clock {
             self.game_seconds,
             self.minutes()
         );
-        self.hour() >= 8 && self.hour() < 20
+        self.hour() >= WORK_TIME_BEGIN && self.hour() < WORK_TIME_END
     }
 
     /// how many in-game hours have elapsed this day

@@ -440,7 +440,7 @@ fn update_gui_state(game: &mut Game, gui_state: &mut GUIState) {
         gui_state.bars.energy_percentage = dave.energy as f32 / MAX_ENERGY as f32;
     }
 
-    gui_state.clock = format!("{} - {:.2}", game.clock, game.clock.time_of_day());
+    gui_state.clock = format!("{}", game.clock);
     gui_state.clock_description = if game.clock.is_work_time() {
         "Work Time".to_string()
     } else {

@@ -1,11 +1,11 @@
 use std::collections::VecDeque;
 
+use crate::icon::{self, icon_button, icon_text};
 use common::{
     yakui::{
         colored_box, pad, widgets,
-        widgets::{Button, ButtonWidget, Text, TextWidget},
         widgets::{List, Pad},
-        Color, CrossAxisAlignment, MainAxisAlignment, MainAxisSize, Response,
+        Color, CrossAxisAlignment, MainAxisAlignment, MainAxisSize,
     },
     BarState, GUICommand, GUIState, BUILDING_TYPE_FACTORY, BUILDING_TYPE_FORGE,
     BUILDING_TYPE_HOUSE,
@@ -46,8 +46,8 @@ fn bars(bar_state: &BarState) {
     column.main_axis_alignment = MainAxisAlignment::End;
     column.cross_axis_alignment = CrossAxisAlignment::Start;
     column.show(|| {
-        bar(HEART, Color::RED, bar_state.health_percentage);
-        bar(BOLT, Color::BLUE, bar_state.energy_percentage);
+        bar(icon::HEART, Color::RED, bar_state.health_percentage);
+        bar(icon::BOLT, Color::BLUE, bar_state.energy_percentage);
     });
 }
 
@@ -58,7 +58,7 @@ fn bar(label: &'static str, colour: Color, percentage: f32) {
     row.item_spacing = 10.;
     row.cross_axis_alignment = CrossAxisAlignment::Center;
     row.show(|| {
-        icon_text(label);
+        icon_text(20., label);
         colored_box(colour, [100. * percentage, 10.]);
     });
 }
@@ -72,13 +72,13 @@ fn build_icons(commands: &mut VecDeque<GUICommand>) {
 
     let mut icon_clicked = None;
     row.show(|| {
-        if icon_button(FORGE).clicked {
+        if icon_button(icon::FORGE).clicked {
             icon_clicked = Some(BUILDING_TYPE_FORGE);
         }
-        if icon_button(FACTORY).clicked {
+        if icon_button(icon::FACTORY).clicked {
             icon_clicked = Some(BUILDING_TYPE_FACTORY);
         }
-        if icon_button(HOUSE).clicked {
+        if icon_button(icon::HOUSE).clicked {
             icon_clicked = Some(BUILDING_TYPE_HOUSE);
         }
     });
@@ -87,30 +87,3 @@ fn build_icons(commands: &mut VecDeque<GUICommand>) {
         commands.push_back(GUICommand::ConstructBuilding(building_type));
     }
 }
-
-fn icon_text(icon_codepoint: &'static str) -> Response<TextWidget> {
-    let mut text = Text::new(20., icon_codepoint);
-    text.style.font = "fontawesome".into();
-    text.show()
-}
-
-fn icon_button(icon_codepoint: &'static str) -> Response<ButtonWidget> {
-    let mut button = Button::unstyled(icon_codepoint);
-    button.padding = Pad::all(4.0);
-    button.style.text.font = "fontawesome".into();
-    button.style.text.font_size = 20.0;
-    button.style.fill = Color::GRAY;
-    button.hover_style.text = button.style.text.clone();
-    button.down_style.text = button.style.text.clone();
-    button.hover_style.fill = Color::CORNFLOWER_BLUE;
-    button.down_style.fill = button.hover_style.fill.adjust(0.7);
-    button.show()
-}
-
-pub const HEART: &str = "\u{f004}";
-pub const BOLT: &str = "\u{f0e7}";
-pub const FORGE: &str = "\u{f06d}";
-pub const FACTORY: &str = "\u{f275}";
-pub const HOUSE: &str = "\u{f015}";
-pub const HAMMER: &str = "\u{f6e3}";
-pub const MOON: &str = "\u{f186}";

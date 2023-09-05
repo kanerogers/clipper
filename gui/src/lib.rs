@@ -1,4 +1,5 @@
 mod bottom_bar;
+mod icon;
 
 use crate::bottom_bar::bottom_bar;
 use std::collections::VecDeque;
@@ -17,6 +18,7 @@ use common::{
     },
     GUICommand, PlaceOfWorkInfo, VikingInfo,
 };
+use icon::icon_text;
 
 pub const CONTAINER_BACKGROUND: Color = Color::rgba(0, 0, 0, 150);
 
@@ -82,6 +84,7 @@ fn clock(gui_state: &mut GUIState) {
     row.main_axis_size = MainAxisSize::Max;
     row.main_axis_alignment = MainAxisAlignment::End;
     row.cross_axis_alignment = CrossAxisAlignment::End;
+    let clock_description = gui_state.clock_description.clone();
 
     row.show(|| {
         let container = ColoredBox::container(CONTAINER_BACKGROUND);
@@ -93,7 +96,19 @@ fn clock(gui_state: &mut GUIState) {
                 col.item_spacing = 10.;
                 col.show(|| {
                     text(20., gui_state.clock.clone());
-                    text(16., gui_state.clock_description.clone());
+
+                    let mut row = List::row();
+                    row.cross_axis_alignment = CrossAxisAlignment::Center;
+                    row.item_spacing = 5.;
+                    row.show(|| {
+                        let icon_glyph = if clock_description == "Work Time" {
+                            icon::HAMMER
+                        } else {
+                            icon::MOON
+                        };
+                        icon_text(16., icon_glyph);
+                        text(16., clock_description);
+                    });
                 });
             });
         });
