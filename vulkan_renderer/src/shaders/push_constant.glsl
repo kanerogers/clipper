@@ -6,4 +6,5 @@ layout(push_constant) uniform push_constants {
     vec4 base_colour_factor;
     vec4 view_pos;
     mat4 mvp;
+    float time_of_day;
 };

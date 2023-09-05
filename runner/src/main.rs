@@ -120,5 +120,11 @@ fn window_tick<R: Renderer>(
         game.resized(renderer.window().inner_size());
     }
     renderer.update_assets(&mut game.world);
-    renderer.render(&game.world, &game.debug_lines, game.camera, &mut gui.yak);
+    renderer.render(
+        &game.world,
+        &game.debug_lines,
+        game.camera,
+        &mut gui.yak,
+        game.clock.time_of_day(),
+    );
 }

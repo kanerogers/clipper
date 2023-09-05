@@ -2,7 +2,7 @@ use std::time::Instant;
 
 use crate::{config::VIKING_MOVE_SPEED, Game};
 use common::{glam::Vec3, hecs::Or, rand};
-use components::{BrainwashState, CombatState, Job, Transform, Velocity, Viking};
+use components::{BrainwashState, CombatState, Job, RestState, Transform, Velocity, Viking};
 use rand::Rng;
 
 pub fn update_viking_velocity(game: &mut Game) {
@@ -10,10 +10,33 @@ pub fn update_viking_velocity(game: &mut Game) {
     update_vikings_in_combat(game);
 
     // Update velocity for Vikings with jobs
-    update_vikings_with_jobs(game);
+    if game.clock.is_work_time() {
+        update_vikings_at_work(game);
+    } else {
+        update_vikings_at_rest(game);
+    }
 
     // Update velocity for Vikings WITHOUT jobs who are NOT in combat
     update_vikings_without_jobs_or_combat(game);
+}
+
+fn update_vikings_at_rest(game: &mut Game) {
+    let world = &game.world;
+
+    for (_, (velocity, transform, rest_state)) in world
+        .query::<(&mut Velocity, &Transform, &RestState)>()
+        .with::<&Job>()
+        .iter()
+    {
+        match rest_state {
+            RestState::GettingFood(destination_entity)
+            | RestState::GoingHome(destination_entity) => {
+                let destination = game.position_of(*destination_entity);
+                velocity.linear = (destination - transform.position).normalize() * VIKING_MOVE_SPEED
+            }
+            _ => *velocity = Default::default(),
+        }
+    }
 }
 
 fn update_vikings_in_combat(game: &mut Game) {
@@ -53,7 +76,7 @@ fn update_vikings_without_jobs_or_combat(game: &mut Game) {
     }
 }
 
-fn update_vikings_with_jobs(game: &mut Game) {
+fn update_vikings_at_work(game: &mut Game) {
     use components::JobState::*;
     let world = &game.world;
     for (_, (velocity, job, transform)) in world
@@ -72,7 +95,6 @@ fn update_vikings_with_jobs(game: &mut Game) {
         } else {
             velocity.linear = Default::default();
         }
-
     }
 }
 

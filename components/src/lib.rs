@@ -81,22 +81,7 @@ pub enum Resource {
     RawIron,
     Iron,
     Paperclip,
-}
-
-impl Resource {
-    pub const fn destination(&self) -> ResourceDestination {
-        match self {
-            Resource::RawIron => ResourceDestination::PlaceOfWork(WorkplaceType::Forge),
-            Resource::Iron => ResourceDestination::PlaceOfWork(WorkplaceType::Factory),
-            Resource::Paperclip => ResourceDestination::Storage,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord, Hash)]
-pub enum ResourceDestination {
-    PlaceOfWork(WorkplaceType),
-    Storage,
+    Food,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -115,7 +100,7 @@ pub struct Selected;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Task {
-    Gather,
+    Gather(Resource),
     Smelt,
     MakePaperclips,
     Construction,
@@ -124,7 +109,7 @@ pub enum Task {
 impl Task {
     pub const fn resource_produced(&self) -> Option<Resource> {
         match self {
-            Task::Gather => Some(Resource::RawIron),
+            Task::Gather(resource) => Some(*resource),
             Task::Smelt => Some(Resource::Iron),
             Task::MakePaperclips => Some(Resource::Paperclip),
             Task::Construction => None,
@@ -133,6 +118,7 @@ impl Task {
 
     pub const fn resource_consumed(&self) -> Option<Resource> {
         match self {
+            Task::Gather(resource) => Some(*resource),
             Task::Smelt => Some(Resource::RawIron),
             Task::MakePaperclips => Some(Resource::Iron),
             _ => None,
@@ -141,7 +127,7 @@ impl Task {
 
     pub const fn work_duration(&self) -> f32 {
         match self {
-            Task::Gather => 8.,
+            Task::Gather(_) => 4.,
             Task::Smelt => 4.,
             Task::MakePaperclips => 5.,
             Task::Construction => 10.,
@@ -149,12 +135,28 @@ impl Task {
     }
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum Building {
+    House,
+    PlaceOfWork(WorkplaceType),
+}
+
+impl Building {
+    pub fn place_of_work(&self) -> Option<WorkplaceType> {
+        match self {
+            Building::PlaceOfWork(workplace) => Some(*workplace),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum WorkplaceType {
     Mine,
     Forge,
     Factory,
     ConstructionSite,
+    Farm,
 }
 
 #[derive(Debug, Clone)]
@@ -169,7 +171,7 @@ impl PlaceOfWork {
     pub fn mine() -> PlaceOfWork {
         PlaceOfWork {
             place_type: WorkplaceType::Mine,
-            task: Task::Gather,
+            task: Task::Gather(Resource::RawIron),
             worker_capacity: 5,
             workers: Default::default(),
         }
@@ -201,37 +203,47 @@ impl PlaceOfWork {
             workers: Default::default(),
         }
     }
+
+    pub fn farm() -> PlaceOfWork {
+        PlaceOfWork {
+            place_type: WorkplaceType::Farm,
+            task: Task::Gather(Resource::Food),
+            worker_capacity: 4,
+            workers: Default::default(),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct BuildingGhost {
-    pub workplace_type: WorkplaceType,
+    pub target_building: Building,
 }
 
 impl BuildingGhost {
-    pub fn new(workplace_type: WorkplaceType) -> Self {
-        Self { workplace_type }
+    pub fn new(target_building: Building) -> Self {
+        Self { target_building }
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct ConstructionSite {
-    pub workplace_type: WorkplaceType,
+    pub target_building: Building,
     pub construction_progress: f32,
 }
 
 impl ConstructionSite {
-    pub fn new(workplace_type: WorkplaceType) -> Self {
+    pub fn new(target_building: Building) -> Self {
         Self {
-            workplace_type,
+            target_building,
             construction_progress: 0.,
         }
     }
 
     pub fn resources_required(&self) -> (usize, Resource) {
-        match self.workplace_type {
-            WorkplaceType::Forge => (1, Resource::RawIron),
-            WorkplaceType::Factory => (1, Resource::Iron),
+        match self.target_building {
+            Building::PlaceOfWork(WorkplaceType::Forge) => (1, Resource::RawIron),
+            Building::PlaceOfWork(WorkplaceType::Factory) => (1, Resource::Iron),
+            Building::House => (2, Resource::Iron),
             _ => unreachable!(),
         }
     }
@@ -376,4 +388,40 @@ impl Health {
     pub fn time_since_last_regen(&self) -> f32 {
         self.last_regen_time.elapsed().as_secs_f32()
     }
+}
+
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct House {
+    pub occupants: Vec<Entity>,
+    pub capacity: usize,
+}
+
+impl House {
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            capacity,
+            ..Default::default()
+        }
+    }
+
+    pub fn has_capacity(&self) -> bool {
+        self.occupants.len() < self.capacity
+    }
+}
+
+#[derive(Debug, Default, Clone, PartialEq)]
+/// Various needs of humans. You want these to be zero.
+pub struct HumanNeeds {
+    pub hunger: usize,
+    pub sleep: usize,
+}
+
+#[derive(Debug, Default, Clone, PartialEq)]
+pub enum RestState {
+    #[default]
+    Idle,
+    GettingFood(Entity),
+    Eating(f32),
+    GoingHome(Entity),
+    Sleeping(f32),
 }

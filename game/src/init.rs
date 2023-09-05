@@ -1,4 +1,5 @@
 use crate::{
+    clock::Clock,
     config::{MAX_ENERGY, MAX_HEALTH},
     Game,
 };
@@ -8,8 +9,8 @@ use common::{
     Camera,
 };
 use components::{
-    Beacon, Collider, Dave, GLTFAsset, Health, Info, Inventory, PlaceOfWork, Resource, Storage,
-    Transform, Velocity, Viking,
+    Beacon, Collider, Dave, GLTFAsset, Health, HumanNeeds, Info, Inventory, PlaceOfWork, Resource,
+    RestState, Storage, Transform, Velocity, Viking,
 };
 
 pub fn init_game() -> Game {
@@ -49,6 +50,9 @@ pub fn init_game() -> Game {
             Transform::from_position([x, 1., z].into()),
             Velocity::default(),
             Info::new(format!("Viking {i}")),
+            HumanNeeds::default(),
+            RestState::default(),
+            Inventory::default(),
         ));
     }
 
@@ -59,7 +63,7 @@ pub fn init_game() -> Game {
         Beacon::default(),
         Transform::default(),
         Info::new("Ship"),
-        Inventory::new([]),
+        Inventory::new([(Resource::Iron, 50), (Resource::Food, 10)]),
         Storage,
     ));
 
@@ -73,6 +77,16 @@ pub fn init_game() -> Game {
         Info::new("Mine"),
     ));
 
+    // farm
+    world.spawn((
+        Collider::default(),
+        GLTFAsset::new("farm.glb"),
+        Transform::from_position([0.0, 0.4, -30.0].into()),
+        PlaceOfWork::farm(),
+        Inventory::new([(Resource::Food, 5000)]),
+        Info::new("Farm"),
+    ));
+
     camera.position.y = 3.;
     camera.position.z = 12.;
     camera.distance = 50.;
@@ -82,6 +96,7 @@ pub fn init_game() -> Game {
         camera,
         dave,
         world,
+        clock: Clock::new(16),
         ..Default::default()
     }
 }

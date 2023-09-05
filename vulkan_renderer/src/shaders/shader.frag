@@ -2,7 +2,8 @@
 #define NO_TEXTURE 4294967295
 #define WORKFLOW_MAIN 0
 #define WORKFLOW_TEXT 1
-#define LIGHT_POS vec3(0., )
+#define sunlightColor vec3(1.0, 1.0, 0.9)
+#define moonlightColor vec3(0.2, 0.2, 0.5)
 
 layout (location = 0) in vec4 in_normal;
 layout (location = 1) in vec4 in_pos;
@@ -15,27 +16,6 @@ layout(set = 0, binding = 0) uniform sampler2D textures[1000];
 #include "push_constant.glsl"
 
 
-vec3 blinn_phong(vec3 baseColour) {
-    vec3 normal = normalize(in_normal.xyz);
-    vec3 lightDir = normalize(vec3(0.5, 0.5, -0.5)); // Simple daylight direction
-    vec3 viewDir = normalize(in_pos.xyz - view_pos.xyz);
-
-    // Diffuse calculation
-    float diff = max(dot(normal, lightDir), 0.0);
-
-    // Specular calculation
-    vec3 halfwayDir = normalize(lightDir + viewDir);
-    float spec = pow(max(dot(normal, halfwayDir), 0.0), 32.0);
-
-    // Combine
-    vec3 ambient = 0.6 * baseColour.xyz;
-    vec3 diffuse = diff * baseColour.xyz;
-    vec3 specular = spec * vec3(1.0, 1.0, 1.0); // white highlight
-
-    vec3 finalColor = ambient + diffuse + (specular * 0.5);
-
-    return finalColor;
-}
 
 // Narkowicz 2015, "ACES Filmic Tone Mapping Curve"
 vec3 aces(vec3 x) {
@@ -63,6 +43,31 @@ vec3 filmic(vec3 x) {
   vec3 result = (X * (6.2 * X + 0.5)) / (X * (6.2 * X + 1.7) + 0.06);
   return pow(result, vec3(2.2));
 }
+
+vec3 blinn_phong(vec3 baseColour) {
+    vec3 normal = normalize(in_normal.xyz);
+    vec3 lightDir = normalize(vec3(0.5, time_of_day, -0.5)); // Simple daylight direction
+    vec3 viewDir = normalize(in_pos.xyz - view_pos.xyz);
+
+    // Diffuse calculation
+    float diff = max(dot(normal, lightDir), 0.0);
+
+    // Specular calculation
+    vec3 halfwayDir = normalize(lightDir + viewDir);
+    float spec = pow(max(dot(normal, halfwayDir), 0.0), 32.0);
+
+    vec3 currentLightColor = mix(moonlightColor, sunlightColor, time_of_day);
+
+    // Combine
+    vec3 ambient = 0.6 * baseColour.xyz * currentLightColor;
+    vec3 diffuse = diff * baseColour.xyz * currentLightColor;
+    vec3 specular = spec * vec3(1.0, 1.0, 1.0); // white highlight
+
+    vec3 finalColor = ambient + diffuse + (specular * 0.5);
+
+    return finalColor;
+}
+
 
 
 void main() {
