@@ -124,27 +124,27 @@ fn inspectors(gui_state: &mut GUIState) {
         ..
     } = gui_state;
     row(|| {
-        // colored_box_container(CONTAINER_BACKGROUND, || {
-        //     pad(Pad::all(10.), || {
-        //         let mut col = widgets::List::column();
-        //         col.main_axis_size = MainAxisSize::Min;
-        //         col.show(|| {
-        //             text(30., "Objectives:");
-        //             text(
-        //                 20.,
-        //                 format!("1. Manufacture paperclips: ({paperclips} produced)"),
-        //             );
-        //             text(
-        //                 20.,
-        //                 format!("2. Maintain AI safety: (0 intelligent AI detected)"),
-        //             );
-        //             text(
-        //                 20.,
-        //                 format!("3. Minimise death: ({total_deaths} deaths caused)"),
-        //             );
-        //         });
-        //     });
-        // });
+        colored_box_container(CONTAINER_BACKGROUND, || {
+            pad(Pad::all(10.), || {
+                let mut col = widgets::List::column();
+                col.main_axis_size = MainAxisSize::Min;
+                col.show(|| {
+                    text(30., "Objectives:");
+                    text(
+                        20.,
+                        format!("1. Manufacture paperclips: ({paperclips} produced)"),
+                    );
+                    text(
+                        20.,
+                        format!("2. Maintain AI safety: (0 intelligent AI detected)"),
+                    );
+                    text(
+                        20.,
+                        format!("3. Minimise death: ({total_deaths} deaths caused)"),
+                    );
+                });
+            });
+        });
         expanded(|| {});
 
         if let Some((entity, selected_item)) = &gui_state.selected_item {

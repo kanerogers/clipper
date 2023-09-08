@@ -1,7 +1,5 @@
 use std::fmt::Display;
 
-use common::log;
-
 use crate::config::{WORK_TIME_BEGIN, WORK_TIME_END};
 
 pub const WALL_TO_GAME: f32 = 120.0;
@@ -40,12 +38,6 @@ impl Clock {
     }
 
     pub fn is_work_time(&self) -> bool {
-        let hour = self.hour();
-        log::trace!(
-            "Seconds: {}, Minute: {}, Hour: {hour}",
-            self.game_seconds,
-            self.minutes()
-        );
         self.hour() >= WORK_TIME_BEGIN && self.hour() < WORK_TIME_END
     }
 

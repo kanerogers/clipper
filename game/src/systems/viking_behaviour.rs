@@ -20,8 +20,9 @@ pub fn viking_behaviour_system(game: &mut Game) {
 
 fn viking_work_system(game: &mut Game) {
     let world = &game.world;
+    let mut command_buffer = game.command_buffer();
     let dt = game.time.delta();
-    for (_, (transform, job, rest_state, inventory)) in world
+    for (viking_entity, (transform, job, rest_state, inventory)) in world
         .query::<(&Transform, &mut Job, &mut RestState, &mut Inventory)>()
         .with::<&Viking>()
         .iter()
@@ -98,7 +99,12 @@ fn viking_work_system(game: &mut Game) {
                 if let Some(amount) = destination_inventory.take(1, *resource) {
                     inventory.add(*resource, amount);
                     job.state = JobState::DroppingOffResource(*resource, job.place_of_work);
+                    continue;
                 }
+
+                // We can't get the resource we need! Abandon hope.
+                log::debug!("Viking failed to fetch resource {resource:?} - removing job {task:?}");
+                command_buffer.remove_one::<Job>(viking_entity);
             }
             JobState::Constructing => {
                 let mut construction_site = world
@@ -108,6 +114,7 @@ fn viking_work_system(game: &mut Game) {
             }
         }
     }
+    game.run_command_buffer(command_buffer);
 }
 
 fn viking_rest_system(game: &mut Game) {
@@ -140,16 +147,13 @@ fn viking_rest_system(game: &mut Game) {
 
                 // Is there an available house?
                 if let Some(available_house) = find_available_house(world) {
+                    occupy_house(world, available_house, viking_entity);
                     *rest_state = RestState::GoingHome(available_house);
-                    world
-                        .get::<&mut House>(available_house)
-                        .unwrap()
-                        .occupants
-                        .push(viking_entity);
                     continue;
                 }
 
                 // Nowhere to sleep!
+                *rest_state = RestState::NoHomeAvailable;
             }
             RestState::GettingFood(storage_entity) => {
                 if transform
@@ -165,6 +169,10 @@ fn viking_rest_system(game: &mut Game) {
                 if target_inventory.take(1, Resource::Food).is_some() {
                     inventory.add(Resource::Food, 1);
                     *rest_state = RestState::Eating(0.);
+                } else {
+                    // There's no food!
+                    *rest_state = RestState::NoFoodAvailable;
+                    log::debug!("No food available!");
                 }
             }
             RestState::Eating(duration) => {
@@ -191,8 +199,31 @@ fn viking_rest_system(game: &mut Game) {
                 needs.sleep = needs.sleep.saturating_sub(1);
                 *duration = 0.;
             }
+            RestState::NoFoodAvailable => {
+                // Is there an available house?
+                if let Some(available_house) = find_available_house(world) {
+                    occupy_house(world, available_house, viking_entity);
+                    *rest_state = RestState::GoingHome(available_house);
+                    continue;
+                }
+
+                // Nowhere to sleep!
+                log::debug!("No home available!");
+                *rest_state = RestState::NoHomeAvailable;
+            }
+            RestState::NoHomeAvailable => {
+                // Nothing to do.
+            }
         }
     }
+}
+
+fn occupy_house(world: &hecs::World, available_house: hecs::Entity, viking_entity: hecs::Entity) {
+    world
+        .get::<&mut House>(available_house)
+        .unwrap()
+        .occupants
+        .push(viking_entity);
 }
 
 fn find_available_house(world: &hecs::World) -> Option<hecs::Entity> {

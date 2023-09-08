@@ -8,6 +8,7 @@ use std::{
 use common::{
     glam::{UVec2, Vec2, Vec3, Vec4},
     hecs::{self, Entity},
+    log,
 };
 mod beacon;
 mod combat_state;
@@ -265,17 +266,17 @@ impl Inventory {
     }
 
     pub fn take(&mut self, amount: usize, resource: Resource) -> Option<usize> {
-        println!("Attempting to take {amount} {resource:?} from {self:?}..");
+        log::trace!("Attempting to take {amount} {resource:?} from {self:?}..");
         if let Some(remaining) = self.inner.get_mut(&resource) {
             if *remaining == 0 {
-                println!("None left!");
+                log::trace!("None left!");
                 return None;
             }
             // TODO do this properly
             *remaining = remaining.checked_sub(amount).unwrap_or_default();
             return Some(amount);
         }
-        println!("No {resource:?} found!");
+        log::trace!("No {resource:?} found!");
 
         None
     }
@@ -424,4 +425,6 @@ pub enum RestState {
     Eating(f32),
     GoingHome(Entity),
     Sleeping(f32),
+    NoFoodAvailable,
+    NoHomeAvailable,
 }
