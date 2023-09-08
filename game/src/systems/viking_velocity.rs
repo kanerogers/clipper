@@ -1,6 +1,9 @@
 use std::time::Instant;
 
-use crate::{config::VIKING_MOVE_SPEED, Game};
+use crate::{
+    config::{COMBAT_RANGE, VIKING_MOVE_SPEED},
+    Game,
+};
 use common::{glam::Vec3, hecs::Or, rand};
 use components::{BrainwashState, CombatState, Job, RestState, Transform, Velocity, Viking};
 use rand::Rng;
@@ -47,6 +50,9 @@ fn update_vikings_in_combat(game: &mut Game) {
         .iter()
     {
         let target_position = game.position_of(combat_state.target);
+        if transform.position.distance(target_position) < COMBAT_RANGE {
+            velocity.linear = Vec3::ZERO;
+        }
         velocity.linear = (target_position - transform.position) * VIKING_MOVE_SPEED;
     }
 }

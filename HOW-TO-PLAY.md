@@ -20,7 +20,7 @@
 ## Intro
 Hey! You're trying to play Clipper! That's fun! Super fun. So much fun. Thanks.
 
-In Clipper, you play as DAVE-1337, an AI that has been programmed to produce paperclips. Your overlords at the Intergalactic Stationary Council have assigned you to a small, iron-rich planet in the Western Spiral arm of the galaxy, whose ape-like life forms have not yet invented digital watches.
+In Clipper, you play as DAVE-37, an AI that has been programmed to produce paperclips. Your overlords at the Intergalactic Stationary Council have assigned you to a small, iron-rich planet in the Western Spiral arm of the galaxy, whose ape-like life forms have not yet invented digital watches.
 
 After a harrowing crash landing, your analysis has concluded that you have arrived in a place named Iceland, at a time period referred to as 924AD. The local ape-like life forms refer to themselves as "Vikings", wear pointy hats, and carry sharp objects.
 

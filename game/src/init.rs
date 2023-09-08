@@ -19,7 +19,7 @@ pub fn init_game() -> Game {
 
     // dave
     let dave = world.spawn((
-        GLTFAsset::new("droid.glb"),
+        GLTFAsset::new("dave.glb"),
         Dave::new(MAX_ENERGY),
         Health::new(MAX_HEALTH),
         Transform::from_position([0., 2., 0.].into()),
@@ -96,7 +96,7 @@ pub fn init_game() -> Game {
         camera,
         dave,
         world,
-        clock: Clock::new(16),
+        clock: Clock::new(6),
         ..Default::default()
     }
 }

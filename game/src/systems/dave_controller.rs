@@ -1,4 +1,4 @@
-use common::glam::Vec3;
+use common::glam::{Quat, Vec3};
 use components::{Transform, Velocity};
 
 use crate::{Game, Keys, PLAYER_SPEED};
@@ -39,4 +39,8 @@ pub fn dave_controller(game: &mut Game) {
     let displacement = velocity.linear * PLAYER_SPEED * dt;
     transform.position += displacement;
     transform.position.y = transform.position.y.min(5.).max(1.);
+
+    let camera_y = game.camera.yaw;
+    transform.scale = Vec3::ONE * 2.;
+    transform.rotation = Quat::from_rotation_y(camera_y - std::f32::consts::PI);
 }
