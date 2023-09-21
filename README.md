@@ -1,17 +1,16 @@
 # clipper
 A game about paperclips.
 
-Here's the [pitch](https://github.com/kanerogers/clipper/issues/1) and here's the [prototype](https://github.com/kanerogers/clipper/issues/2).
-
 ## Running the game
-I'm experimenting with ways to iterate on a game as fast as possible. At the moment I'm using [hot-lib-reloader](https://docs.rs/hot-lib-reloader/latest/hot_lib_reloader/) to link the "game logic" (stored in the helpfully named "game" crate) as a linked library at runtime, updating the library when it changes. This setup is not without its downsides, and requires a little bit of fuckery to get working correctly (see the `common` crate, which essentially just re-exports any dependencies shared between the `game` crate and anything else to avoid Dreaded Dependency Hell). But overall, it's resulted in a very pleasant development experience.
+Since we're not ready for prime-time yet, you have to be a turbo-nerd Rust developer to do it. If you'd like to also be a turbo-nerd Rust developer, simply head to [The Rust toolchain installer](https://rustup.rs/) to get started.
 
-To witness this magic, open two terminals, one running:
+Once you're done, clone the repo and start the game with:
 
-`cargo watch -w game -w common -x 'build -p game'`
+```shell
+cargo run
+```
 
-and the other running:
+You'll want to also make sure you've got [the Vulkan SDK](https://vulkan.lunarg.com/) installed too.
 
-`cargo run --target-dir target-bin`
-
-And all your wildest dreams will come true.
+## How to play the game
+Since we don't have a tutorial or really any sort of useful content in the game, check out the [how to play guide](HOW-TO-PLAY.md).
