@@ -1,4 +1,4 @@
-use crate::{ClickState, Game};
+use crate::{input::ClickState, Game};
 use common::hecs;
 use components::{Info, Selected};
 

@@ -3,10 +3,9 @@ use std::time::Instant;
 use common::hecs::Or;
 use components::{BrainwashState, Job, Targeted, Viking};
 
-pub use crate::Game;
 use crate::{
     config::{BRAINWASH_TIME, ENERGY_DRAIN_TIME},
-    Keys,
+    Game, Keys,
 };
 
 pub fn brainwash_system(game: &mut Game) {
