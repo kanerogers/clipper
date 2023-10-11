@@ -1,6 +1,7 @@
 pub mod camera;
 pub mod clock;
 mod config;
+pub mod ecs;
 mod game;
 mod gui_interop;
 mod init;

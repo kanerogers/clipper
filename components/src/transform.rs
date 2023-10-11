@@ -1,11 +1,12 @@
 use std::ops::Mul;
 
+use serde::{Serialize, Deserialize};
 use common::{
     glam::{Affine3A, Mat4, Quat, Vec3},
     rapier3d::na,
 };
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct Transform {
     pub position: Vec3,
     pub scale: Vec3,

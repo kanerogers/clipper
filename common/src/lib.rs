@@ -2,13 +2,17 @@ use std::collections::VecDeque;
 
 pub use anyhow;
 pub use bitflags;
+pub use erased_serde;
 pub use glam;
 pub use hecs;
 use hecs::Entity;
 pub use log;
 pub use rand;
 pub use rapier3d;
+pub use serde;
+pub use serde_json;
 pub use thunderdome;
+pub use typetag;
 pub use winit;
 pub use yakui;
 

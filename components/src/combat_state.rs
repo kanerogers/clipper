@@ -1,6 +1,7 @@
 use std::time::Instant;
 
 use common::hecs;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone)]
 pub struct CombatState {

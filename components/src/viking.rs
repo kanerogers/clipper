@@ -1,5 +1,7 @@
 use std::{fmt::Display, time::Instant};
 
+use serde::{Deserialize, Serialize};
+
 #[derive(Clone, Debug)]
 pub struct Viking {
     pub brainwash_state: BrainwashState,
@@ -32,7 +34,7 @@ impl Viking {
     }
 }
 
-#[derive(Clone, Debug, Copy, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Copy, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub enum BrainwashState {
     Free,
     BeingBrainwashed(f32),

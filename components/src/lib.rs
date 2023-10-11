@@ -18,10 +18,11 @@ mod viking;
 pub use beacon::Beacon;
 pub use combat_state::CombatState;
 pub use job::{Job, JobState};
+use serde::{Deserialize, Serialize};
 pub use transform::Transform;
 pub use viking::{BrainwashState, Viking};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GLTFAsset {
     pub name: String,
 }
@@ -32,26 +33,29 @@ impl GLTFAsset {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Targeted;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TargetIndicator(pub hecs::Entity);
 
 /// tag component to indicate that we'd like a collider based on our geometry, please
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Collider {
     pub y_offset: f32,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Parent {
     pub entity: Entity,
     pub offset: Transform,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Velocity {
     pub linear: Vec3,
 }
 
-#[derive(Debug, Clone)]
 pub struct Dave {
     pub energy: usize,
     pub last_brainwash_time: Instant,
@@ -77,7 +81,7 @@ impl Default for Dave {
     }
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum Resource {
     RawIron,
     Iron,
@@ -85,7 +89,7 @@ pub enum Resource {
     Food,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Info {
     pub name: String,
 }
@@ -96,10 +100,10 @@ impl Info {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Selected;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Task {
     Gather(Resource),
     Smelt,
@@ -136,7 +140,7 @@ impl Task {
     }
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum Building {
     House,
     PlaceOfWork(WorkplaceType),
@@ -151,7 +155,7 @@ impl Building {
     }
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum WorkplaceType {
     Mine,
     Forge,
@@ -160,7 +164,7 @@ pub enum WorkplaceType {
     Farm,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlaceOfWork {
     pub place_type: WorkplaceType,
     pub task: Task,
@@ -215,7 +219,7 @@ impl PlaceOfWork {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BuildingGhost {
     pub target_building: Building,
 }
@@ -226,7 +230,7 @@ impl BuildingGhost {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConstructionSite {
     pub target_building: Building,
     pub construction_progress: f32,
@@ -250,10 +254,10 @@ impl ConstructionSite {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Storage;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Inventory {
     inner: HashMap<Resource, usize>,
 }
@@ -349,7 +353,7 @@ pub struct Primitive {
     pub material: Material,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MaterialOverrides {
     pub base_colour_factor: Vec4,
 }
@@ -391,7 +395,7 @@ impl Health {
     }
 }
 
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct House {
     pub occupants: Vec<Entity>,
     pub capacity: usize,
@@ -410,14 +414,14 @@ impl House {
     }
 }
 
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 /// Various needs of humans. You want these to be zero.
 pub struct HumanNeeds {
     pub hunger: usize,
     pub sleep: usize,
 }
 
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub enum RestState {
     #[default]
     Idle,

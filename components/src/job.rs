@@ -1,10 +1,11 @@
 use std::fmt::Display;
 
 use common::hecs;
+use serde::{Deserialize, Serialize};
 
 use crate::Resource;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Job {
     pub place_of_work: hecs::Entity,
     pub state: JobState,
@@ -19,7 +20,7 @@ impl Job {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum JobState {
     GoingToPlaceOfWork,
     Working(f32),
