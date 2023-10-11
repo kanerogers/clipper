@@ -17,9 +17,8 @@ pub struct Time {
     #[serde(skip, default = "Instant::now")]
     start_of_frame: Instant,
     #[serde(skip)]
-    delta: GameTime,
-    #[serde(skip)]
     accumulated: f64,
+    delta: GameTime,
     now: GameTime,
 }
 

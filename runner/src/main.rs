@@ -1,3 +1,4 @@
+use game::Game;
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 use vulkan_renderer::LazyVulkan;
 
@@ -18,6 +19,15 @@ use common::{
 const INITIAL_SCREEN_WIDTH: u32 = 1000;
 const INITIAL_SCREEN_HEIGHT: u32 = 1000;
 
+fn load_game_from_disk() -> Result<Game, common::anyhow::Error> {
+    let game_json = std::fs::read("game.json")?;
+    log::info!("game.json found! Loading from disk..");
+    let value: common::serde_json::Value = common::serde_json::from_slice(&game_json).unwrap();
+    let game = game::Game::from_json(&value)?;
+    log::info!("Loading complete!");
+    Ok(game)
+}
+
 pub fn init<R: Renderer>() -> (
     R,
     EventLoop<()>,
@@ -35,7 +45,9 @@ pub fn init<R: Renderer>() -> (
         .with_title("Clipper".to_string())
         .build(&event_loop)
         .unwrap();
-    let mut game = game::init();
+
+    let mut game = load_game_from_disk().unwrap_or(game::init());
+
     game.resized(window.inner_size());
     let yak_winit = yakui_winit::YakuiWinit::new(&window);
 

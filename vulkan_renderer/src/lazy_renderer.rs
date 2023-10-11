@@ -33,7 +33,7 @@ pub struct LazyRenderer {
     /// The graphics pipeline used to draw meshes
     mesh_pipeline: vk::Pipeline,
     /// The pipeline layout used to draw LINES
-    _line_pipeline_layout: vk::PipelineLayout,
+    line_pipeline_layout: vk::PipelineLayout,
     /// The graphics pipeline used to draw lines. It has a funny name.
     line_pipeline: vk::Pipeline,
     /// A single vertex buffer, shared between all draw calls
@@ -317,7 +317,7 @@ impl LazyRenderer {
             mesh_pipeline_layout,
             mesh_pipeline,
             line_pipeline,
-            _line_pipeline_layout: line_pipeline_layout,
+            line_pipeline_layout,
             geometry_buffers,
             line_vertex_buffer,
             user_textures: Default::default(),
@@ -506,7 +506,7 @@ impl LazyRenderer {
             texture.cleanup(device);
         }
         device.destroy_pipeline_layout(self.mesh_pipeline_layout, None);
-        device.destroy_pipeline_layout(self.mesh_pipeline_layout, None);
+        device.destroy_pipeline_layout(self.line_pipeline_layout, None);
         device.destroy_pipeline(self.mesh_pipeline, None);
         device.destroy_pipeline(self.line_pipeline, None);
         self.geometry_buffers.cleanup(device);

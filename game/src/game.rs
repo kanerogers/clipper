@@ -137,6 +137,7 @@ impl Game {
         let values = GameValues::from_value(value)
             .ok_or_else(|| anyhow!("Invalid JSON: {}", value.to_string()))?;
         let world = serialisation_context.deserialise_world(&values.world)?;
+
         let time = serde_json::from_value(values.time)?;
         let dave = serde_json::from_value(values.dave)?;
         let camera = serde_json::from_value(values.camera)?;
