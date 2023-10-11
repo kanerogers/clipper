@@ -6,3 +6,5 @@
 /Cargo.lock
 xcuserdata/
 .DS_Store
+
+game.json
