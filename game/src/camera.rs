@@ -21,7 +21,7 @@ pub fn update_camera(game: &mut Game) {
 
     let mut t = 1.0;
     if distance_to_target > 0.01 {
-        t = ((1. - focus_centering) as f32).powf(dt);
+        t = ((1. - focus_centering) as f32).powf(dt.into());
     }
     if distance_to_target > focus_radius {
         t = t.min(focus_radius / distance_to_target);
@@ -29,9 +29,9 @@ pub fn update_camera(game: &mut Game) {
     camera.focus_point = camera.target.lerp(camera.focus_point, t);
 
     let camera_rotate = input.keyboard_state.as_axis(Keys::E, Keys::Q);
-    camera.yaw += camera_rotate * CAMERA_ROTATE_SPEED * dt;
+    camera.yaw += camera_rotate * CAMERA_ROTATE_SPEED * dt.as_secs_f32();
 
-    set_camera_distance(input, camera, dt);
+    set_camera_distance(input, camera, dt.into());
 
     camera.pitch = -45_f32.to_radians();
     let look_rotation = Quat::from_euler(common::glam::EulerRot::YXZ, camera.yaw, camera.pitch, 0.);

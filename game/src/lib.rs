@@ -10,10 +10,10 @@ mod systems;
 pub mod time;
 use camera::update_camera;
 use common::{glam::Vec3, winit, GUIState, Line};
+use components::GameTime;
 pub use game::Game;
 use gui_interop::{process_gui_command_queue, update_gui_state};
 use input::{reset_mouse_clicks, Input, Keys};
-use std::time::Instant;
 use systems::{
     beacons, brainwash::brainwash_system, click_system, combat::combat_system,
     construction::construction_system, dave_controller,
@@ -93,13 +93,13 @@ pub fn handle_winit_event(game: &mut Game, event: winit::event::WindowEvent) {
 
 #[derive(Debug, Clone)]
 pub struct HumanNeedsState {
-    pub last_updated_at: Instant,
+    pub last_updated_at: GameTime,
 }
 
 impl Default for HumanNeedsState {
     fn default() -> Self {
         Self {
-            last_updated_at: Instant::now(),
+            last_updated_at: GameTime::default(),
         }
     }
 }

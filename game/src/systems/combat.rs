@@ -1,5 +1,3 @@
-use std::time::Instant;
-
 use common::hecs::{self, Or};
 use components::{BrainwashState, CombatState, Health, Job, Transform, Viking};
 
@@ -34,10 +32,10 @@ fn handle_combat(game: &mut Game) {
         }
 
         let mut target_health = game.get::<Health>(combat_state.target);
-        if combat_state.time_since_last_attack() > VIKING_ATTACK_COOLDOWN_TIME {
+        if game.time.elapsed(combat_state.last_attack_time) > VIKING_ATTACK_COOLDOWN_TIME {
             println!("Attacking!");
-            target_health.take(VIKING_ATTACK_DAMAGE * viking.strength);
-            combat_state.last_attack_time = Instant::now();
+            target_health.take(VIKING_ATTACK_DAMAGE * viking.strength, game.now());
+            combat_state.last_attack_time = Default::default();
         }
     }
 }

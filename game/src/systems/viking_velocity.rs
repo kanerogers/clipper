@@ -1,11 +1,11 @@
-use std::time::Instant;
-
 use crate::{
     config::{COMBAT_RANGE, VIKING_MOVE_SPEED},
     Game,
 };
 use common::{glam::Vec3, hecs::Or, rand};
-use components::{BrainwashState, CombatState, Job, RestState, Transform, Velocity, Viking};
+use components::{
+    BrainwashState, CombatState, GameTime, Job, RestState, Transform, Velocity, Viking,
+};
 use rand::Rng;
 
 pub fn update_viking_velocity(game: &mut Game) {
@@ -68,8 +68,8 @@ fn update_vikings_without_jobs_or_combat(game: &mut Game) {
     {
         velocity.linear = match viking.brainwash_state {
             BrainwashState::Free | BrainwashState::BeingBrainwashed(_) => {
-                if viking.last_update.elapsed().as_secs_f32() > 1.0 {
-                    viking.last_update = Instant::now();
+                if game.time.elapsed(viking.last_update) > 1.0 {
+                    viking.last_update = GameTime::default();
                     random_movement()
                 } else {
                     continue;

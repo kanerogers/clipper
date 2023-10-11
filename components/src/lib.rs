@@ -1,8 +1,8 @@
 use std::{
     collections::{HashMap, VecDeque},
-    ops::AddAssign,
+    fmt::Display,
+    ops::{AddAssign, Sub},
     sync::Arc,
-    time::Instant,
 };
 
 use common::{
@@ -21,6 +21,79 @@ pub use job::{Job, JobState};
 use serde::{Deserialize, Serialize};
 pub use transform::Transform;
 pub use viking::{BrainwashState, Viking};
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, PartialOrd, Copy)]
+pub struct GameTime(f64);
+
+impl PartialOrd<f32> for GameTime {
+    fn partial_cmp(&self, other: &f32) -> Option<std::cmp::Ordering> {
+        self.as_secs_f32().partial_cmp(other)
+    }
+}
+
+impl PartialEq<f32> for GameTime {
+    fn eq(&self, other: &f32) -> bool {
+        self.as_secs_f32() == *other
+    }
+}
+
+impl Display for GameTime {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} seconds", self.0)
+    }
+}
+
+impl Sub for GameTime {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self(self.0 - rhs.0)
+    }
+}
+
+impl GameTime {
+    pub fn as_secs_f32(&self) -> f32 {
+        self.0 as _
+    }
+
+    pub fn as_secs_f64(&self) -> f64 {
+        self.0 as _
+    }
+
+    pub fn add(&mut self, actual_delta: f64) {
+        self.0 += actual_delta
+    }
+}
+
+impl AddAssign<GameTime> for f32 {
+    fn add_assign(&mut self, rhs: GameTime) {
+        *self += rhs.as_secs_f32()
+    }
+}
+
+impl From<f64> for GameTime {
+    fn from(value: f64) -> Self {
+        GameTime(value)
+    }
+}
+
+impl From<f32> for GameTime {
+    fn from(value: f32) -> Self {
+        GameTime(value as _)
+    }
+}
+
+impl From<GameTime> for f32 {
+    fn from(value: GameTime) -> Self {
+        value.0 as _
+    }
+}
+
+impl From<GameTime> for f64 {
+    fn from(value: GameTime) -> Self {
+        value.0
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GLTFAsset {
@@ -51,15 +124,22 @@ pub struct Parent {
     pub offset: Transform,
 }
 
+impl Parent {
+    pub fn new(entity: Entity, offset: Transform) -> Self {
+        Self { entity, offset }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Velocity {
     pub linear: Vec3,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Dave {
     pub energy: usize,
-    pub last_brainwash_time: Instant,
-    pub last_energy_drain_time: Instant,
+    pub last_brainwash_time: GameTime,
+    pub last_energy_drain_time: GameTime,
 }
 
 impl Dave {
@@ -67,16 +147,6 @@ impl Dave {
         Self {
             energy,
             ..Default::default()
-        }
-    }
-}
-
-impl Default for Dave {
-    fn default() -> Self {
-        Self {
-            energy: Default::default(),
-            last_brainwash_time: Instant::now(),
-            last_energy_drain_time: Instant::now(),
         }
     }
 }
@@ -358,40 +428,32 @@ pub struct MaterialOverrides {
     pub base_colour_factor: Vec4,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Health {
     pub value: usize,
-    pub last_taken_time: Instant,
-    pub last_regen_time: Instant,
+    pub last_taken_time: GameTime,
+    pub last_regen_time: GameTime,
 }
 
 impl Health {
     pub fn new(value: usize) -> Self {
         Self {
             value,
-            last_taken_time: Instant::now(),
-            last_regen_time: Instant::now(),
+            last_taken_time: GameTime::default(),
+            last_regen_time: GameTime::default(),
         }
     }
 
-    pub fn take(&mut self, amount: usize) -> usize {
+    pub fn take(&mut self, amount: usize, now: GameTime) -> usize {
         self.value = self.value.saturating_sub(amount);
-        self.last_taken_time = Instant::now();
+        self.last_taken_time = now;
         self.value
     }
 
-    pub fn add(&mut self, amount: usize) -> usize {
+    pub fn add(&mut self, amount: usize, now: GameTime) -> usize {
         self.value = (self.value + amount).min(100);
-        self.last_regen_time = Instant::now();
+        self.last_regen_time = now;
         self.value
-    }
-
-    pub fn time_since_last_taken(&self) -> f32 {
-        self.last_taken_time.elapsed().as_secs_f32()
-    }
-
-    pub fn time_since_last_regen(&self) -> f32 {
-        self.last_regen_time.elapsed().as_secs_f32()
     }
 }
 

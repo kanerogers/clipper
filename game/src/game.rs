@@ -5,7 +5,7 @@ use common::{
     rapier3d::prelude::Ray,
     winit, Camera, Line,
 };
-use components::{Dave, Storage, Transform};
+use components::{Dave, GameTime, Storage, Transform};
 
 pub struct Game {
     pub world: hecs::World,
@@ -85,5 +85,9 @@ impl Game {
             .next()
             .unwrap()
             .0
+    }
+
+    pub fn now(&self) -> GameTime {
+        self.time.now()
     }
 }

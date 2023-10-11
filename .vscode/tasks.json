@@ -26,7 +26,7 @@
 			"args": [
 				"-p",
 				"game",
-				"test_trivial_serialisation"
+				"ecs"
 			],
 			"problemMatcher": [
 				"$rustc"

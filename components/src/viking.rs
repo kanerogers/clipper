@@ -1,26 +1,16 @@
-use std::{fmt::Display, time::Instant};
+use std::fmt::Display;
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug)]
+use crate::GameTime;
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct Viking {
     pub brainwash_state: BrainwashState,
-    pub last_update: Instant,
+    pub last_update: GameTime,
     pub intelligence: usize,
     pub strength: usize,
     pub stamina: usize,
-}
-
-impl Default for Viking {
-    fn default() -> Self {
-        Self {
-            last_update: Instant::now(),
-            brainwash_state: BrainwashState::Free,
-            intelligence: 0,
-            strength: 0,
-            stamina: 0,
-        }
-    }
 }
 
 impl Viking {
@@ -34,8 +24,9 @@ impl Viking {
     }
 }
 
-#[derive(Clone, Debug, Copy, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, Copy, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 pub enum BrainwashState {
+    #[default]
     Free,
     BeingBrainwashed(f32),
     Brainwashed,

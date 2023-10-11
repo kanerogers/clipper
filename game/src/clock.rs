@@ -1,5 +1,7 @@
 use std::fmt::Display;
 
+use components::GameTime;
+
 use crate::config::{WORK_TIME_BEGIN, WORK_TIME_END};
 
 pub const WALL_TO_GAME: f32 = 120.0;
@@ -28,8 +30,8 @@ impl Clock {
             game_seconds: (hour * 60 * 60) as f32,
         }
     }
-    pub fn advance(&mut self, dt: f32) {
-        self.game_seconds += dt * WALL_TO_GAME;
+    pub fn advance(&mut self, dt: GameTime) {
+        self.game_seconds += dt.as_secs_f32() * WALL_TO_GAME;
 
         if self.hour() >= 24 {
             self.game_seconds = 0.;
@@ -84,7 +86,7 @@ mod tests {
 
         // Advance the clock to 8000
         for _ in 0..(4 * 60 * 60) {
-            clock.advance(dt);
+            clock.advance(dt.into());
         }
 
         assert_eq!(format!("{clock}"), "Day 0: 08:00");
@@ -93,7 +95,7 @@ mod tests {
 
         // Advance the clock to 2000
         for _ in 0..(6 * 60 * 60) {
-            clock.advance(dt);
+            clock.advance(dt.into());
         }
 
         assert_eq!(format!("{clock}"), "Day 0: 20:00");
@@ -102,14 +104,14 @@ mod tests {
 
         // Advance the clock to 2359
         for _ in 0..(2 * 60 * 60) - 1 {
-            clock.advance(dt);
+            clock.advance(dt.into());
         }
 
         assert_eq!(format!("{clock}"), "Day 0: 23:59");
         assert_eq!(clock.day(), 0);
 
         // Now it's 00:00 the next day
-        clock.advance(dt);
+        clock.advance(dt.into());
         assert_eq!(clock.day(), 1);
         assert_eq!(format!("{clock}"), "Day 1: 00:00");
     }

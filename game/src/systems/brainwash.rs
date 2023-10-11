@@ -1,7 +1,5 @@
-use std::time::Instant;
-
 use common::hecs::Or;
-use components::{BrainwashState, Job, Targeted, Viking};
+use components::{BrainwashState, GameTime, Job, Targeted, Viking};
 
 use crate::{
     config::{BRAINWASH_TIME, ENERGY_DRAIN_TIME},
@@ -36,7 +34,7 @@ pub fn brainwash_system(game: &mut Game) {
                     continue;
                 }
 
-                *amount += dt * 1. / viking.stamina as f32;
+                *amount += dt.as_secs_f32() * 1. / viking.stamina as f32;
                 did_brainwash = true;
 
                 if *amount >= BRAINWASH_TIME {
@@ -53,10 +51,10 @@ pub fn brainwash_system(game: &mut Game) {
         }
     }
 
-    if did_brainwash && dave.last_brainwash_time.elapsed().as_secs_f32() >= ENERGY_DRAIN_TIME {
+    if did_brainwash && game.time.elapsed(dave.last_brainwash_time) >= ENERGY_DRAIN_TIME {
         dave.energy -= 1;
-        dave.last_brainwash_time = Instant::now();
-        dave.last_energy_drain_time = Instant::now();
+        dave.last_brainwash_time = GameTime::default();
+        dave.last_energy_drain_time = GameTime::default();
     }
 
     // Reset the brainwash state of any vikings who are no longer being targeted

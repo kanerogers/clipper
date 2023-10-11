@@ -1,7 +1,7 @@
-use std::time::Instant;
-
 use common::{glam::Quat, hecs::CommandBuffer, log};
-use components::{HumanNeeds, Job, RestState, Selected, Targeted, Transform, Velocity, Viking};
+use components::{
+    GameTime, HumanNeeds, Job, RestState, Selected, Targeted, Transform, Velocity, Viking,
+};
 
 use crate::{
     config::{MAX_HUNGER, MAX_SLEEP},
@@ -11,17 +11,11 @@ use crate::{
 pub fn human_needs_system(game: &mut Game) {
     let mut command_buffer = CommandBuffer::new();
     let world = &game.world;
-    if game
-        .human_needs_state
-        .last_updated_at
-        .elapsed()
-        .as_secs_f32()
-        <= 60.
-    {
+    if game.time.elapsed(game.human_needs_state.last_updated_at) <= 60. {
         return;
     }
 
-    game.human_needs_state.last_updated_at = Instant::now();
+    game.human_needs_state.last_updated_at = GameTime::default();
 
     for (viking_entity, (rest_state, needs, transform)) in world
         .query::<(&RestState, &mut HumanNeeds, &mut Transform)>()

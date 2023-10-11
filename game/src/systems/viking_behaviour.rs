@@ -45,7 +45,7 @@ fn viking_work_system(game: &mut Game) {
                 }
             }
             JobState::Working(work_time_elapsed) => {
-                *work_time_elapsed += dt;
+                *work_time_elapsed += dt.as_secs_f32();
                 let mut work_inventory = world.get::<&mut Inventory>(job.place_of_work).unwrap();
 
                 // Does this job require a specific kind of resource?

@@ -9,9 +9,9 @@ use common::{
     serde_json,
 };
 use components::{
-    Building, BuildingGhost, Collider, CombatState, ConstructionSite, Dave, GLTFAsset, House,
-    HumanNeeds, Info, Inventory, Job, MaterialOverrides, Parent, PlaceOfWork, Resource, RestState,
-    Selected, Storage, TargetIndicator, Targeted, Task, Transform, Velocity, Viking,
+    Building, BuildingGhost, Collider, CombatState, ConstructionSite, Dave, GLTFAsset, Health,
+    House, HumanNeeds, Info, Inventory, Job, MaterialOverrides, Parent, PlaceOfWork, Resource,
+    RestState, Selected, Storage, TargetIndicator, Targeted, Task, Transform, Velocity, Viking,
 };
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -100,7 +100,7 @@ impl Default for SerialisationContext {
     fn default() -> Self {
         let serializers = [
             c::<TestComponent>("TestComponent"),
-            // c::<Dave>("Dave"), // TODO
+            c::<Dave>("Dave"),
             c::<GLTFAsset>("GLTFAsset"),
             c::<Targeted>("Targeted"),
             c::<TargetIndicator>("TargetIndicator"),
@@ -118,14 +118,14 @@ impl Default for SerialisationContext {
             c::<Storage>("Storage"),
             c::<Inventory>("Inventory"),
             c::<MaterialOverrides>("MaterialOverrides"),
-            // c::<Health>("Health"), // TODO
+            c::<Health>("Health"),
             c::<House>("House"),
             c::<HumanNeeds>("HumanNeeds"),
             c::<RestState>("RestState"),
             c::<Transform>("Transform"),
-            // c::<CombatState>("CombatState"), // TODO
+            c::<CombatState>("CombatState"), // TODO
             c::<Job>("Job"),
-            // c::<Viking>("Viking"), //TODO
+            c::<Viking>("Viking"),
         ];
 
         let mut serialisers_by_name = HashMap::new();
@@ -200,16 +200,23 @@ mod tests {
 
     #[test]
     pub fn test_trivial_serialisation_roundtrip() {
-        use common::hecs::World;
-
         let mut world = World::new();
+
+        // Spawn an entity with a trivial component
         world.spawn((TestComponent { foo: 42 },));
+
+        // Initialise the serialisation context
         let serialisation_context = SerialisationContext::default();
+
+        // Serialise the world to a `serde_json::Value`
         let serialised_world = serialisation_context.serialise_world(&mut world).unwrap();
+
+        // Deserialise the world from a `serde_json::Value`
         let mut deserialised_world = serialisation_context
             .deserialise_world(&serialised_world)
             .unwrap();
 
+        // Attempt to retrive our trivial component.
         let foo = deserialised_world
             .query_mut::<&TestComponent>()
             .into_iter()
@@ -218,11 +225,41 @@ mod tests {
             .1
             .foo;
 
+        // Ensure it has the correct data
         assert_eq!(foo, 42);
     }
 
     #[test]
     pub fn test_entity_references_roundtrip() {
+        let mut world = World::new();
 
+        // Spawn entity A with a trivial component
+        let a = world.spawn((TestComponent { foo: 42 },));
+
+        // Spawn another entity that has a component referencing entity A
+        world.spawn((
+            TestComponent { foo: 69 },
+            Parent::new(a, Default::default()),
+        ));
+
+        // Attempt serialisation roundtrip
+        let serialisation_context = SerialisationContext::default();
+        let serialised_world = serialisation_context.serialise_world(&mut world).unwrap();
+        let mut deserialised_world = serialisation_context
+            .deserialise_world(&serialised_world)
+            .unwrap();
+
+        // Attempt to retrieve our component with a reference
+        let a = deserialised_world
+            .query_mut::<&Parent>()
+            .into_iter()
+            .next()
+            .unwrap()
+            .1
+            .entity;
+
+        // Verify this entity has the correct data
+        let foo = world.get::<&TestComponent>(a).unwrap().foo;
+        assert_eq!(foo, 42);
     }
 }
