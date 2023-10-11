@@ -9,15 +9,15 @@ pub fn regen_system(game: &mut Game) {
     let mut dave = game.dave();
 
     // energy
-    if dave.last_brainwash_time.elapsed().as_secs_f32() > ENERGY_REGEN_TIME {
+    if game.time.elapsed(dave.last_brainwash_time) > ENERGY_REGEN_TIME {
         dave.energy = (dave.energy + 1).min(MAX_ENERGY);
     }
 
     // health
     let mut health = game.get::<Health>(game.dave);
-    if health.time_since_last_taken() > ENERGY_REGEN_TIME
-        && health.time_since_last_regen() > HEALTH_REGEN_RATE
+    if game.time.elapsed(health.last_taken_time) > ENERGY_REGEN_TIME
+        && game.time.elapsed(health.last_regen_time) > HEALTH_REGEN_RATE
     {
-        health.add(1);
+        health.add(1, game.now());
     }
 }

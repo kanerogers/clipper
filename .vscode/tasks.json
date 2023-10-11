@@ -25,7 +25,8 @@
 			"command": "test",
 			"args": [
 				"-p",
-				"asset_loader"
+				"game",
+				"ecs"
 			],
 			"problemMatcher": [
 				"$rustc"
@@ -34,7 +35,7 @@
 				"kind": "test",
 				"isDefault": true
 			},
-			"label": "rust: cargo test",
+			"label": "Test ECS deserialisation",
 			"env": {
 				"RUST_LOG": "debug",
 			}

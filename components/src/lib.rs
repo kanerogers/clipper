@@ -1,8 +1,8 @@
 use std::{
     collections::{HashMap, VecDeque},
-    ops::AddAssign,
+    fmt::Display,
+    ops::{AddAssign, Sub},
     sync::Arc,
-    time::Instant,
 };
 
 use common::{
@@ -18,10 +18,84 @@ mod viking;
 pub use beacon::Beacon;
 pub use combat_state::CombatState;
 pub use job::{Job, JobState};
+use serde::{Deserialize, Serialize};
 pub use transform::Transform;
 pub use viking::{BrainwashState, Viking};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, PartialOrd, Copy)]
+pub struct GameTime(f64);
+
+impl PartialOrd<f32> for GameTime {
+    fn partial_cmp(&self, other: &f32) -> Option<std::cmp::Ordering> {
+        self.as_secs_f32().partial_cmp(other)
+    }
+}
+
+impl PartialEq<f32> for GameTime {
+    fn eq(&self, other: &f32) -> bool {
+        self.as_secs_f32() == *other
+    }
+}
+
+impl Display for GameTime {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} seconds", self.0)
+    }
+}
+
+impl Sub for GameTime {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self(self.0 - rhs.0)
+    }
+}
+
+impl GameTime {
+    pub fn as_secs_f32(&self) -> f32 {
+        self.0 as _
+    }
+
+    pub fn as_secs_f64(&self) -> f64 {
+        self.0 as _
+    }
+
+    pub fn add(&mut self, actual_delta: f64) {
+        self.0 += actual_delta
+    }
+}
+
+impl AddAssign<GameTime> for f32 {
+    fn add_assign(&mut self, rhs: GameTime) {
+        *self += rhs.as_secs_f32()
+    }
+}
+
+impl From<f64> for GameTime {
+    fn from(value: f64) -> Self {
+        GameTime(value)
+    }
+}
+
+impl From<f32> for GameTime {
+    fn from(value: f32) -> Self {
+        GameTime(value as _)
+    }
+}
+
+impl From<GameTime> for f32 {
+    fn from(value: GameTime) -> Self {
+        value.0 as _
+    }
+}
+
+impl From<GameTime> for f64 {
+    fn from(value: GameTime) -> Self {
+        value.0
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GLTFAsset {
     pub name: String,
 }
@@ -32,30 +106,40 @@ impl GLTFAsset {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Targeted;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TargetIndicator(pub hecs::Entity);
 
 /// tag component to indicate that we'd like a collider based on our geometry, please
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Collider {
     pub y_offset: f32,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Parent {
     pub entity: Entity,
     pub offset: Transform,
 }
 
-#[derive(Debug, Clone, Default)]
+impl Parent {
+    pub fn new(entity: Entity, offset: Transform) -> Self {
+        Self { entity, offset }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Velocity {
     pub linear: Vec3,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Dave {
     pub energy: usize,
-    pub last_brainwash_time: Instant,
-    pub last_energy_drain_time: Instant,
+    pub last_brainwash_time: GameTime,
+    pub last_energy_drain_time: GameTime,
 }
 
 impl Dave {
@@ -67,17 +151,7 @@ impl Dave {
     }
 }
 
-impl Default for Dave {
-    fn default() -> Self {
-        Self {
-            energy: Default::default(),
-            last_brainwash_time: Instant::now(),
-            last_energy_drain_time: Instant::now(),
-        }
-    }
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum Resource {
     RawIron,
     Iron,
@@ -85,7 +159,7 @@ pub enum Resource {
     Food,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Info {
     pub name: String,
 }
@@ -96,10 +170,10 @@ impl Info {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Selected;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Task {
     Gather(Resource),
     Smelt,
@@ -136,7 +210,7 @@ impl Task {
     }
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum Building {
     House,
     PlaceOfWork(WorkplaceType),
@@ -151,7 +225,7 @@ impl Building {
     }
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum WorkplaceType {
     Mine,
     Forge,
@@ -160,7 +234,7 @@ pub enum WorkplaceType {
     Farm,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlaceOfWork {
     pub place_type: WorkplaceType,
     pub task: Task,
@@ -215,7 +289,7 @@ impl PlaceOfWork {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BuildingGhost {
     pub target_building: Building,
 }
@@ -226,7 +300,7 @@ impl BuildingGhost {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConstructionSite {
     pub target_building: Building,
     pub construction_progress: f32,
@@ -250,10 +324,10 @@ impl ConstructionSite {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Storage;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Inventory {
     inner: HashMap<Resource, usize>,
 }
@@ -349,49 +423,41 @@ pub struct Primitive {
     pub material: Material,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MaterialOverrides {
     pub base_colour_factor: Vec4,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Health {
     pub value: usize,
-    pub last_taken_time: Instant,
-    pub last_regen_time: Instant,
+    pub last_taken_time: GameTime,
+    pub last_regen_time: GameTime,
 }
 
 impl Health {
     pub fn new(value: usize) -> Self {
         Self {
             value,
-            last_taken_time: Instant::now(),
-            last_regen_time: Instant::now(),
+            last_taken_time: GameTime::default(),
+            last_regen_time: GameTime::default(),
         }
     }
 
-    pub fn take(&mut self, amount: usize) -> usize {
+    pub fn take(&mut self, amount: usize, now: GameTime) -> usize {
         self.value = self.value.saturating_sub(amount);
-        self.last_taken_time = Instant::now();
+        self.last_taken_time = now;
         self.value
     }
 
-    pub fn add(&mut self, amount: usize) -> usize {
+    pub fn add(&mut self, amount: usize, now: GameTime) -> usize {
         self.value = (self.value + amount).min(100);
-        self.last_regen_time = Instant::now();
+        self.last_regen_time = now;
         self.value
-    }
-
-    pub fn time_since_last_taken(&self) -> f32 {
-        self.last_taken_time.elapsed().as_secs_f32()
-    }
-
-    pub fn time_since_last_regen(&self) -> f32 {
-        self.last_regen_time.elapsed().as_secs_f32()
     }
 }
 
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct House {
     pub occupants: Vec<Entity>,
     pub capacity: usize,
@@ -410,14 +476,14 @@ impl House {
     }
 }
 
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 /// Various needs of humans. You want these to be zero.
 pub struct HumanNeeds {
     pub hunger: usize,
     pub sleep: usize,
 }
 
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub enum RestState {
     #[default]
     Idle,

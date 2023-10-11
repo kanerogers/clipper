@@ -7,7 +7,8 @@ use components::{
 
 use crate::{
     config::{BUILDING_TRANSPARENCY, CONSTRUCTION_TIME},
-    ClickState, Game,
+    input::ClickState,
+    Game,
 };
 
 pub fn construction_system(game: &mut Game) {

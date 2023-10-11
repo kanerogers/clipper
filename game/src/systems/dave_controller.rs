@@ -36,7 +36,7 @@ pub fn dave_controller(game: &mut Game) {
     velocity.linear = velocity.linear.lerp(movement, 0.1);
 
     // Velocity, baby!
-    let displacement = velocity.linear * PLAYER_SPEED * dt;
+    let displacement = velocity.linear * PLAYER_SPEED * dt.as_secs_f32();
     transform.position += displacement;
     transform.position.y = transform.position.y.min(5.).max(1.);
 

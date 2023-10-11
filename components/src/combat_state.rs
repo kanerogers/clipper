@@ -1,22 +1,19 @@
-use std::time::Instant;
-
 use common::hecs;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone)]
+use crate::GameTime;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CombatState {
     pub target: hecs::Entity,
-    pub last_attack_time: Instant,
+    pub last_attack_time: GameTime,
 }
 
 impl CombatState {
     pub fn new(target: hecs::Entity) -> Self {
         Self {
             target,
-            last_attack_time: Instant::now(),
+            last_attack_time: Default::default(),
         }
-    }
-
-    pub fn time_since_last_attack(&self) -> f32 {
-        self.last_attack_time.elapsed().as_secs_f32()
     }
 }

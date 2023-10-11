@@ -114,7 +114,7 @@ pub fn physics(game: &mut Game) {
     update_colliders(game);
 
     // step
-    game.physics_context.step(game.time.delta());
+    game.physics_context.step(game.time.delta().as_secs_f32());
 
     debug_lines(game);
 }
