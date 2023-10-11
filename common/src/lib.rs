@@ -10,6 +10,7 @@ pub use log;
 pub use rand;
 pub use rapier3d;
 pub use serde;
+use serde::{Deserialize, Serialize};
 pub use serde_json;
 pub use thunderdome;
 pub use typetag;
@@ -40,7 +41,7 @@ impl GeometryOffsets {
     }
 }
 
-#[derive(Clone, Default, Debug, Copy)]
+#[derive(Clone, Default, Debug, Copy, Serialize, Deserialize)]
 pub struct Camera {
     pub position: glam::Vec3,
     pub pitch: f32,

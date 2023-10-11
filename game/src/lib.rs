@@ -9,7 +9,11 @@ mod input;
 mod systems;
 pub mod time;
 use camera::update_camera;
-use common::{glam::Vec3, winit, GUIState, Line};
+use common::{
+    glam::Vec3,
+    serde::{self, Deserialize, Serialize},
+    winit, GUIState, Line,
+};
 use components::GameTime;
 pub use game::Game;
 use gui_interop::{process_gui_command_queue, update_gui_state};
@@ -91,7 +95,8 @@ pub fn handle_winit_event(game: &mut Game, event: winit::event::WindowEvent) {
     input::handle_winit_event(game, event);
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(crate = "serde")]
 pub struct HumanNeedsState {
     pub last_updated_at: GameTime,
 }

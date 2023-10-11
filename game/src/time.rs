@@ -1,3 +1,6 @@
+use std::time::Instant;
+
+use common::serde::{self, Deserialize, Serialize};
 use components::GameTime;
 
 const UPDATE_RATE: f64 = 1.0 / 60.0;
@@ -6,20 +9,31 @@ const MAX_ACCUMULATOR_MS: f64 = 50.0;
 /// A timestep implementation that's actually good.
 ///
 /// Stolen with love from @lpghatguy
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(crate = "serde")]
 pub struct Time {
-    start_of_game: GameTime,
-    start_of_frame: GameTime,
+    #[serde(skip, default = "Instant::now")]
+    start_of_game: Instant,
+    #[serde(skip, default = "Instant::now")]
+    start_of_frame: Instant,
+    #[serde(skip)]
     delta: GameTime,
+    #[serde(skip)]
     accumulated: f64,
     now: GameTime,
+}
+
+impl Default for Time {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Time {
     pub fn new() -> Self {
         Self {
-            start_of_game: GameTime::default(),
-            start_of_frame: GameTime::default(),
+            start_of_game: Instant::now(),
+            start_of_frame: Instant::now(),
             delta: UPDATE_RATE.into(),
             accumulated: 0.0,
             now: Default::default(),
@@ -43,7 +57,7 @@ impl Time {
     /// Start a new frame, accumulating time. Within a frame, there can be zero
     /// or more updates.
     pub fn start_frame(&mut self) {
-        let now = GameTime::default();
+        let now = Instant::now();
         let actual_delta = (now - self.start_of_frame).as_secs_f64();
         self.now.add(actual_delta);
 
@@ -64,11 +78,5 @@ impl Time {
 
         self.accumulated -= UPDATE_RATE;
         true
-    }
-}
-
-impl Default for Time {
-    fn default() -> Self {
-        Self::new()
     }
 }

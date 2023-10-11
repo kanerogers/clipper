@@ -100,6 +100,9 @@ fn main() {
         }
     });
 
+    log::info!("Game is shutting down..");
+    let game_json = common::serde_json::to_value(&game).unwrap();
+    std::fs::write("game.json", game_json.to_string()).unwrap();
     renderer.cleanup();
 }
 

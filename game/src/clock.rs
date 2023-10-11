@@ -1,5 +1,6 @@
 use std::fmt::Display;
 
+use common::serde::{self, Deserialize, Serialize};
 use components::GameTime;
 
 use crate::config::{WORK_TIME_BEGIN, WORK_TIME_END};
@@ -7,7 +8,8 @@ use crate::config::{WORK_TIME_BEGIN, WORK_TIME_END};
 pub const WALL_TO_GAME: f32 = 120.0;
 
 /// The in-game clock
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(crate="serde")]
 pub struct Clock {
     day: usize,
     game_seconds: f32,

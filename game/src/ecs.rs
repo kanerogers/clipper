@@ -144,10 +144,7 @@ impl Default for SerialisationContext {
 }
 
 impl SerialisationContext {
-    pub fn serialise_world(
-        &self,
-        world: &mut hecs::World,
-    ) -> Result<serde_json::Value, anyhow::Error> {
+    pub fn serialise_world(&self, world: &hecs::World) -> Result<serde_json::Value, anyhow::Error> {
         let mut map = serde_json::Map::new();
 
         for entity in world.iter() {
