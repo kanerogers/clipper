@@ -1,3 +1,5 @@
+> **NOTE:** This prototype is now complete and will not see any further work! It remains archived for anyone interested in poking around.
+
 # clipper
 A game about paperclips.
 
