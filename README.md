@@ -1,4 +1,6 @@
 > **NOTE:** This prototype is now complete and will not see any further work! It remains archived for anyone interested in poking around.
+>
+> If you'd like to follow updates on the game's development, head on over to [our website](https://adequate.games/)!
 
 # clipper
 A game about paperclips.
